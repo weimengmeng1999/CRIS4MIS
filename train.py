@@ -20,7 +20,7 @@ from loguru import logger
 from torch.optim.lr_scheduler import MultiStepLR
 
 import utils.config as config
-import wandb
+# import wandb
 from utils.dataset import RefDataset
 from engine.engine import train, validate
 from model import build_segmenter
@@ -83,13 +83,13 @@ def main_worker(gpu, args):
                             rank=args.rank)
 
     # wandb
-    if args.rank == 0:
-        wandb.init(job_type="training",
-                   mode="online",
-                   config=args,
-                   project="CRIS",
-                   name=args.exp_name,
-                   tags=[args.dataset, args.clip_pretrain])
+    # if args.rank == 0:
+    #     wandb.init(job_type="training",
+    #                mode="online",
+    #                config=args,
+    #                project="CRIS",
+    #                name=args.exp_name,
+    #                tags=[args.dataset, args.clip_pretrain])
     dist.barrier()
 
     # build model
@@ -211,8 +211,8 @@ def main_worker(gpu, args):
         torch.cuda.empty_cache()
 
     time.sleep(2)
-    if dist.get_rank() == 0:
-        wandb.finish()
+    # if dist.get_rank() == 0:
+    #     wandb.finish()
 
     logger.info("* Best IoU={} * ".format(best_IoU))
     total_time = time.time() - start_time

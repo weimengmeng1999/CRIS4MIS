@@ -7,7 +7,7 @@ import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
 import torch.nn.functional as F
-import wandb
+# import wandb
 from loguru import logger
 from utils.dataset import tokenize
 from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather,
@@ -74,17 +74,17 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         if (i + 1) % args.print_freq == 0:
             progress.display(i + 1)
-            if dist.get_rank() in [-1, 0]:
-                wandb.log(
-                    {
-                        "time/batch": batch_time.val,
-                        "time/data": data_time.val,
-                        "training/lr": lr.val,
-                        "training/loss": loss_meter.val,
-                        "training/iou": iou_meter.val,
-                        "training/prec@50": pr_meter.val,
-                    },
-                    step=epoch * len(train_loader) + (i + 1))
+            # if dist.get_rank() in [-1, 0]:
+            #     wandb.log(
+            #         {
+            #             "time/batch": batch_time.val,
+            #             "time/data": data_time.val,
+            #             "training/lr": lr.val,
+            #             "training/loss": loss_meter.val,
+            #             "training/iou": iou_meter.val,
+            #             "training/prec@50": pr_meter.val,
+            #         },
+            #         step=epoch * len(train_loader) + (i + 1))
 
 
 @torch.no_grad()
@@ -111,7 +111,8 @@ def validate(val_loader, model, epoch, args):
             h, w = np.array(ori_size)
             mat = np.array(mat)
             pred = pred.cpu().numpy()
-            pred = cv2.warpAffine(pred, mat, (w, h),
+            pred = cv2.warpAffine(pred,
+                                  mat, (w, h),
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
             pred = np.array(pred > 0.35)
@@ -179,7 +180,8 @@ def inference(test_loader, model, args):
             h, w = param['ori_size'].numpy()[0]
             mat = param['inverse'].numpy()[0]
             pred = pred.cpu().numpy()
-            pred = cv2.warpAffine(pred, mat, (w, h),
+            pred = cv2.warpAffine(pred,
+                                  mat, (w, h),
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
             pred = np.array(pred > 0.35)
@@ -190,9 +192,10 @@ def inference(test_loader, model, args):
             iou_list.append(iou)
             # dump prediction
             if args.visualize:
-                pred = np.array(pred*255, dtype=np.uint8)
+                pred = np.array(pred * 255, dtype=np.uint8)
                 sent = "_".join(sent[0].split(" "))
-                pred_name = '{}-iou={:.2f}-{}.png'.format(seg_id, iou*100, sent)
+                pred_name = '{}-iou={:.2f}-{}.png'.format(
+                    seg_id, iou * 100, sent)
                 cv2.imwrite(filename=os.path.join(args.vis_dir, pred_name),
                             img=pred)
     logger.info('=> Metric Calculation <=')
@@ -205,11 +208,11 @@ def inference(test_loader, model, args):
     iou = iou_list.mean()
     prec = {}
     for i, thres in enumerate(range(5, 10)):
-        key = 'Pr@{}'.format(thres*10)
+        key = 'Pr@{}'.format(thres * 10)
         value = prec_list[i].item()
         prec[key] = value
-    logger.info('IoU={:.2f}'.format(100.*iou.item()))
+    logger.info('IoU={:.2f}'.format(100. * iou.item()))
     for k, v in prec.items():
-        logger.info('{}: {:.2f}.'.format(k, 100.*v))
+        logger.info('{}: {:.2f}.'.format(k, 100. * v))
 
     return iou.item(), prec
