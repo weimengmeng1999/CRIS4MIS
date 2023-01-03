@@ -22,8 +22,8 @@ TRAIN:
   dropout: 0.1
   intermediate: False
   # Training Setting
-  workers: 32  # data loader workers
-  workers_val: 16
+  workers: 8  # data loader workers
+  workers_val: 4
   epochs: 50
   milestones: [35]
   start_epoch: 0
