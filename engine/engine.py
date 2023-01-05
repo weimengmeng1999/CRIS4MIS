@@ -105,9 +105,9 @@ def validate(val_loader, model, epoch, args):
                                   mode='bicubic',
                                   align_corners=True).squeeze(1)
         # process one batch
-        for pred, mask_dir, mat, ori_size in zip(preds, param['mask_dir'],
-                                                 param['inverse'],
-                                                 param['ori_size']):
+        for pred, mask_path, mat, ori_size in zip(preds, param['mask_path'],
+                                                  param['inverse'],
+                                                  param['ori_size']):
             h, w = np.array(ori_size)
             mat = np.array(mat)
             pred = pred.cpu().numpy()
@@ -116,7 +116,7 @@ def validate(val_loader, model, epoch, args):
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
             pred = np.array(pred > 0.35)
-            mask = cv2.imread(mask_dir, flags=cv2.IMREAD_GRAYSCALE)
+            mask = cv2.imread(mask_path, flags=cv2.IMREAD_GRAYSCALE)
             mask = mask / 255.
             # iou
             inter = np.logical_and(pred, mask)
@@ -153,7 +153,7 @@ def inference(test_loader, model, args):
     for img, param in tbar:
         # data
         img = img.cuda(non_blocking=True)
-        mask = cv2.imread(param['mask_dir'][0], flags=cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imread(param['mask_path'][0], flags=cv2.IMREAD_GRAYSCALE)
         # dump image & mask
         if args.visualize:
             seg_id = param['seg_id'][0].cpu().numpy()

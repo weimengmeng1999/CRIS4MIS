@@ -2,6 +2,7 @@ import os
 from typing import List, Union
 
 import cv2
+import json
 import lmdb
 import numpy as np
 import pyarrow as pa
@@ -139,7 +140,7 @@ class RefDataset(Dataset):
         img_size = img.shape[:2]
         # mask
         seg_id = ref['seg_id']
-        mask_dir = os.path.join(self.mask_dir, str(seg_id) + '.png')
+        mask_path = os.path.join(self.mask_dir, str(seg_id) + '.png')
         # sentences
         idx = np.random.choice(ref['num_sents'])
         sents = ref['sents']
@@ -172,7 +173,7 @@ class RefDataset(Dataset):
             word_vec = tokenize(sent, self.word_length, True).squeeze(0)
             img = self.convert(img)[0]
             params = {
-                'mask_dir': mask_dir,
+                'mask_path': mask_path,
                 'inverse': mat_inv,
                 'ori_size': np.array(img_size)
             }
@@ -183,7 +184,7 @@ class RefDataset(Dataset):
             params = {
                 'ori_img': ori_img,
                 'seg_id': seg_id,
-                'mask_dir': mask_dir,
+                'mask_path': mask_path,
                 'inverse': mat_inv,
                 'ori_size': np.array(img_size),
                 'sents': sents
@@ -234,3 +235,119 @@ class RefDataset(Dataset):
 
     # def get_sample(self, idx):
     #     return self.__getitem__(idx)
+
+
+class EndoVisDataset(Dataset):
+    """
+    data_root: the root of data_file, img_path, mask_path.
+    data_file: str
+        Data structure in data_file, list of dict, for each dict:
+        {
+            'img_path': str,
+            'mask_path': str,
+            'num_sents': int,
+            'sents': [str, ...],
+        }
+    """
+    def __init__(self, data_root, data_file, mode, input_size, word_length):
+        super(EndoVisDataset, self).__init__()
+        self.data_root = data_root
+        self.data_file = data_file
+        self.data = json.load(open(os.path.join(data_root, data_file)))
+        self.mode = mode
+        self.input_size = (input_size, input_size)
+        self.word_length = word_length
+        self.mean = torch.tensor([0.48145466, 0.4578275,
+                                  0.40821073]).reshape(3, 1, 1)
+        self.std = torch.tensor([0.26862954, 0.26130258,
+                                 0.27577711]).reshape(3, 1, 1)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        ref = self.data[index]
+        # img
+        ori_img = cv2.imread(os.path.join(self.data_root, ref['img_path']))
+        img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
+        img_size = img.shape[:2]
+        # mask
+        mask_path = os.path.join(self.data_root, ref['mask_path'])
+        # sentences
+        idx = np.random.choice(ref['num_sents'])
+        sents = ref['sents']
+        # transform
+        mat, mat_inv = self.getTransformMat(img_size, True)
+        img = cv2.warpAffine(
+            img,
+            mat,
+            self.input_size,
+            flags=cv2.INTER_CUBIC,
+            borderValue=[0.48145466 * 255, 0.4578275 * 255, 0.40821073 * 255])
+        if self.mode == 'train':
+            # mask transform
+            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            mask = cv2.warpAffine(mask,
+                                  mat,
+                                  self.input_size,
+                                  flags=cv2.INTER_LINEAR,
+                                  borderValue=0.)
+            mask = mask / 255.
+            # sentence -> vector
+            sent = sents[idx]
+            word_vec = tokenize(sent, self.word_length, True).squeeze(0)
+            img, mask = self.convert(img, mask)
+            return img, word_vec, mask
+        elif self.mode == 'val':
+            # sentence -> vector
+            sent = sents[0]
+            word_vec = tokenize(sent, self.word_length, True).squeeze(0)
+            img = self.convert(img)[0]
+            params = {
+                'mask_path': mask_path,
+                'inverse': mat_inv,
+                'ori_size': np.array(img_size)
+            }
+            return img, word_vec, params
+        else:
+            # sentence -> vector
+            img = self.convert(img)[0]
+            params = {
+                'ori_img': ori_img,
+                'seg_id': 0,
+                'mask_path': mask_path,
+                'inverse': mat_inv,
+                'ori_size': np.array(img_size),
+                'sents': sents
+            }
+            return img, params
+
+    def getTransformMat(self, img_size, inverse=False):
+        ori_h, ori_w = img_size
+        inp_h, inp_w = self.input_size
+        scale = min(inp_h / ori_h, inp_w / ori_w)
+        new_h, new_w = ori_h * scale, ori_w * scale
+        bias_x, bias_y = (inp_w - new_w) / 2., (inp_h - new_h) / 2.
+
+        src = np.array([[0, 0], [ori_w, 0], [0, ori_h]], np.float32)
+        dst = np.array([[bias_x, bias_y], [new_w + bias_x, bias_y],
+                        [bias_x, new_h + bias_y]], np.float32)
+
+        mat = cv2.getAffineTransform(src, dst)
+        if inverse:
+            mat_inv = cv2.getAffineTransform(dst, src)
+            return mat, mat_inv
+        return mat, None
+
+    def convert(self, img, mask=None):
+        # Image ToTensor & Normalize
+        img = torch.from_numpy(img.transpose((2, 0, 1)))
+        if not isinstance(img, torch.FloatTensor):
+            img = img.float()
+        img.div_(255.).sub_(self.mean).div_(self.std)
+        # Mask ToTensor
+        if mask is not None:
+            mask = torch.from_numpy(mask)
+            if not isinstance(mask, torch.FloatTensor):
+                mask = mask.float()
+        return img, mask

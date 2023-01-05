@@ -21,7 +21,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 import utils.config as config
 # import wandb
-from utils.dataset import RefDataset
+from utils.dataset import RefDataset, EndoVisDataset
 from engine.engine import train, validate
 from model import build_segmenter
 from utils.misc import (init_random_seed, set_random_seed, setup_logger,
@@ -60,6 +60,8 @@ def main():
     args.ngpus_per_node = torch.cuda.device_count()
     args.world_size = args.ngpus_per_node * args.world_size
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
+    # for debug
+    # main_worker(0, args)
 
 
 def main_worker(gpu, args):
@@ -115,20 +117,30 @@ def main_worker(gpu, args):
     args.batch_size_val = int(args.batch_size_val / args.ngpus_per_node)
     args.workers = int(
         (args.workers + args.ngpus_per_node - 1) / args.ngpus_per_node)
-    train_data = RefDataset(lmdb_dir=args.train_lmdb,
-                            mask_dir=args.mask_root,
-                            dataset=args.dataset,
-                            split=args.train_split,
-                            mode='train',
-                            input_size=args.input_size,
-                            word_length=args.word_len)
-    val_data = RefDataset(lmdb_dir=args.val_lmdb,
-                          mask_dir=args.mask_root,
-                          dataset=args.dataset,
-                          split=args.val_split,
-                          mode='val',
-                          input_size=args.input_size,
-                          word_length=args.word_len)
+    # train_data = RefDataset(lmdb_dir=args.train_lmdb,
+    #                         mask_dir=args.mask_root,
+    #                         dataset=args.dataset,
+    #                         split=args.train_split,
+    #                         mode='train',
+    #                         input_size=args.input_size,
+    #                         word_length=args.word_len)
+    # val_data = RefDataset(lmdb_dir=args.val_lmdb,
+    #                       mask_dir=args.mask_root,
+    #                       dataset=args.dataset,
+    #                       split=args.val_split,
+    #                       mode='val',
+    #                       input_size=args.input_size,
+    #                       word_length=args.word_len)
+    train_data = EndoVisDataset(data_root=args.train_data_root,
+                                data_file=args.train_data_file,
+                                mode='train',
+                                input_size=args.input_size,
+                                word_length=args.word_len)
+    val_data = EndoVisDataset(data_root=args.test_data_root,
+                              data_file=args.val_data_file,
+                              mode='val',
+                              input_size=args.input_size,
+                              word_length=args.word_len)
 
     # build dataloader
     init_fn = partial(worker_init_fn,
