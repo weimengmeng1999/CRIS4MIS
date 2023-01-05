@@ -18,7 +18,7 @@ class2sents = {
     ],
     'claspers': [
         'claspers', 'instrument claspers', 'tool claspers', 'instrument head',
-        'too head'
+        'tool head'
     ],
     'bipolar_forceps': ['bipolar forceps'],
     'prograsp_forceps': ['prograsp forceps'],
@@ -116,7 +116,7 @@ def process(root_dir, cris_data_file):
             ]):
                 if class_id == 0:
                     continue
-                target_mask = (parts_mask == class_id) * 255
+                target_mask = (instruments_mask == class_id) * 255
                 if target_mask.sum() != 0:
                     cris_data_list.append(
                         get_one_sample(root_dir, image_file, image_path,
