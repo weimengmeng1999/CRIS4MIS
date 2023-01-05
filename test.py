@@ -11,7 +11,7 @@ from loguru import logger
 import utils.config as config
 from engine.engine import inference
 from model import build_segmenter
-from utils.dataset import RefDataset
+from utils.dataset import RefDataset, EndoVisDataset
 from utils.misc import setup_logger
 
 warnings.filterwarnings("ignore")
@@ -53,13 +53,18 @@ def main():
     logger.info(args)
 
     # build dataset & dataloader
-    test_data = RefDataset(lmdb_dir=args.test_lmdb,
-                           mask_dir=args.mask_root,
-                           dataset=args.dataset,
-                           split=args.test_split,
-                           mode='test',
-                           input_size=args.input_size,
-                           word_length=args.word_len)
+    # test_data = RefDataset(lmdb_dir=args.test_lmdb,
+    #                        mask_dir=args.mask_root,
+    #                        dataset=args.dataset,
+    #                        split=args.test_split,
+    #                        mode='test',
+    #                        input_size=args.input_size,
+    #                        word_length=args.word_len)
+    test_data = EndoVisDataset(data_root=args.test_data_root,
+                               data_file=args.test_data_file,
+                               mode='test',
+                               input_size=args.input_size,
+                               word_length=args.word_len)
     test_loader = torch.utils.data.DataLoader(test_data,
                                               batch_size=1,
                                               shuffle=False,

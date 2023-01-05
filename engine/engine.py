@@ -2,6 +2,7 @@ import os
 import time
 from tqdm import tqdm
 import cv2
+import copy
 import numpy as np
 import torch
 import torch.cuda.amp as amp
@@ -154,18 +155,18 @@ def inference(test_loader, model, args):
         # data
         img = img.cuda(non_blocking=True)
         mask = cv2.imread(param['mask_path'][0], flags=cv2.IMREAD_GRAYSCALE)
+        mask = mask / 255.
         # dump image & mask
-        if args.visualize:
-            seg_id = param['seg_id'][0].cpu().numpy()
-            img_name = '{}-img.jpg'.format(seg_id)
-            mask_name = '{}-mask.png'.format(seg_id)
-            cv2.imwrite(filename=os.path.join(args.vis_dir, img_name),
-                        img=param['ori_img'][0].cpu().numpy())
-            cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
-                        img=mask)
+        # if args.visualize:
+        #     seg_id = param['seg_id'][0].cpu().numpy()
+        #     img_name = '{}-img.jpg'.format(seg_id)
+        #     mask_name = '{}-mask.png'.format(seg_id)
+        #     cv2.imwrite(filename=os.path.join(args.vis_dir, img_name),
+        #                 img=param['ori_img'][0].cpu().numpy())
+        #     cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
+        #                 img=mask)
         # multiple sentences
         for sent in param['sents']:
-            mask = mask / 255.
             text = tokenize(sent, args.word_len, True)
             text = text.cuda(non_blocking=True)
             # inference
@@ -184,6 +185,7 @@ def inference(test_loader, model, args):
                                   mat, (w, h),
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
+            score = copy.deepcopy(pred)
             pred = np.array(pred > 0.35)
             # iou
             inter = np.logical_and(pred, mask)
@@ -192,12 +194,27 @@ def inference(test_loader, model, args):
             iou_list.append(iou)
             # dump prediction
             if args.visualize:
-                pred = np.array(pred * 255, dtype=np.uint8)
+                image_split = param['mask_path'][0].split('/')[-3]
+                image_id = param['mask_path'][0].split('/')[-1].split('_')[0]
+                seg_type = '_'.join(param['sents'][0][0].split(' '))
                 sent = "_".join(sent[0].split(" "))
-                pred_name = '{}-iou={:.2f}-{}.png'.format(
-                    seg_id, iou * 100, sent)
-                cv2.imwrite(filename=os.path.join(args.vis_dir, pred_name),
-                            img=pred)
+
+                score_name = 'score-{}-{}-{}-{}.png'.format(
+                    image_split, image_id, seg_type, sent)
+                cv2.imwrite(filename=os.path.join(args.vis_dir, score_name),
+                            img=score)
+
+                pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.png'.format(
+                    image_split, image_id, seg_type, iou * 100, sent)
+                image = cv2.imread(
+                    './EndoVis2017/cropped_test/{}/images/{}.png'.format(
+                        image_split, image_id))
+                show = np.zeros(image.shape)
+                show[:, :, 0] = 255
+                pred = pred.astype(np.float64) * 0.5
+                vis_image = image * (1 - pred[:, :, None]) + \
+                    show * pred[:, :, None]
+                cv2.imwrite(os.path.join(args.vis_dir, pred_name), vis_image)
     logger.info('=> Metric Calculation <=')
     iou_list = np.stack(iou_list)
     iou_list = torch.from_numpy(iou_list).to(img.device)
