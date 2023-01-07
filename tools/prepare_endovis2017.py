@@ -7,7 +7,7 @@ import numpy as np
 class2sents = {
     'background': ['background', 'body tissues', 'organs'],
     'instrument':
-    ['instrument', 'medical instrument', 'tool', 'medical instrument'],
+    ['instrument', 'medical instrument', 'tool', 'medical tool'],
     'shaft': [
         'shaft', 'instrument shaft', 'tool shaft', 'instrument body',
         'tool body', 'instrument handle', 'tool handle'
@@ -128,7 +128,8 @@ def process(root_dir, cris_data_file):
 
 
 if __name__ == '__main__':
-    # /jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/EndoVis2017/cropped_test
+    # must add last "/"
+    # /jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/EndoVis2017/cropped_test/
     root_dir = sys.argv[1]
     # cris_test.json
     cris_data_file = sys.argv[2]
