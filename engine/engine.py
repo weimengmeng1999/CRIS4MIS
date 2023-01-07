@@ -166,7 +166,9 @@ def inference(test_loader, model, args):
         #     cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
         #                 img=mask)
         # multiple sentences
-        for sent in param['sents']:
+        for sent_idx, sent in enumerate(param['sents']):
+            if args.only_pred_first_sent and (sent_idx != 0):
+                continue
             text = tokenize(sent, args.word_len, True)
             text = text.cuda(non_blocking=True)
             # inference
@@ -181,11 +183,17 @@ def inference(test_loader, model, args):
             h, w = param['ori_size'].numpy()[0]
             mat = param['inverse'].numpy()[0]
             pred = pred.cpu().numpy()
+            if args.visualize:
+                save_dict = {
+                    'pred': copy.deepcopy(pred),
+                    'mat': mat,
+                    'h': h,
+                    'w': w,
+                }
             pred = cv2.warpAffine(pred,
                                   mat, (w, h),
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
-            score = copy.deepcopy(pred)
             pred = np.array(pred > 0.35)
             # iou
             inter = np.logical_and(pred, mask)
@@ -199,16 +207,19 @@ def inference(test_loader, model, args):
                 seg_type = '_'.join(param['sents'][0][0].split(' '))
                 sent = "_".join(sent[0].split(" "))
 
-                score_name = 'score-{}-{}-{}-{}.png'.format(
-                    image_split, image_id, seg_type, sent)
-                cv2.imwrite(filename=os.path.join(args.vis_dir, score_name),
-                            img=score)
+                if sent_idx == 0:
+                    score_name = 'score-{}-{}-{}.npz'.format(
+                        image_split, image_id, seg_type, sent)
+                    np.savez_compressed(os.path.join(args.score_dir, score_name), **save_dict)
 
-                pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.png'.format(
+                pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.jpg'.format(
                     image_split, image_id, seg_type, iou * 100, sent)
-                image = cv2.imread(
-                    './EndoVis2017/cropped_test/{}/images/{}.png'.format(
-                        image_split, image_id))
+                if 'train' in args.test_data_root:
+                    suffix = 'jpg'
+                elif 'test' in args.test_data_root:
+                    suffix = 'png'
+                image = cv2.imread(os.path.join(args.test_data_root, '{}/images/{}.{}'.format(
+                        image_split, image_id, suffix)))
                 show = np.zeros(image.shape)
                 show[:, :, 0] = 255
                 pred = pred.astype(np.float64) * 0.5

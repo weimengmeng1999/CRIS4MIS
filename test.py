@@ -25,6 +25,8 @@ def get_parser():
                         default='path to xxx.yaml',
                         type=str,
                         help='config file')
+    parser.add_argument('--only_pred_first_sent',
+                        action='store_true')
     parser.add_argument('--opts',
                         default=None,
                         nargs=argparse.REMAINDER,
@@ -42,7 +44,9 @@ def main():
     args = get_parser()
     args.output_dir = os.path.join(args.output_folder, args.exp_name)
     if args.visualize:
-        args.vis_dir = os.path.join(args.output_dir, "vis")
+        args.score_dir = os.path.join(args.output_dir, "score")
+        os.makedirs(args.score_dir, exist_ok=True)
+        args.vis_dir = os.path.join(args.output_dir, "test_vis")
         os.makedirs(args.vis_dir, exist_ok=True)
 
     # logger
