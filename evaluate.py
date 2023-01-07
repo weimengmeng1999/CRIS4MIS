@@ -29,6 +29,7 @@ def general_jaccard(y_true, y_pred):
 
     return np.mean(result)
 
+
 def general_dice(y_true, y_pred):
     result = []
 
@@ -44,9 +45,6 @@ def general_dice(y_true, y_pred):
         result += [dice(y_true == instrument_id, y_pred == instrument_id)]
 
     return np.mean(result)
-
-
-
 
 
 def jaccard(y_true, y_pred):
@@ -186,7 +184,7 @@ if __name__ == '__main__':
             result_jaccard += [general_jaccard(y_true, y_pred)]
             result_dice += [general_dice(y_true, y_pred)]
 
-    print('Jaccard (IoU): mean={:.4f}, std={:.4f}'.format(np.mean(result_jaccard),
-                                                    np.std(result_jaccard)))
-    print('Dice: mean={:.4f}, std={:.4f}'.format(np.mean(result_dice),
-                                                 np.std(result_dice)))
+    print('Jaccard (IoU): mean={:.2f}, std={:.4f}'.format(
+        np.mean(result_jaccard) * 100, np.std(result_jaccard)))
+    print('Dice: mean={:.2f}, std={:.4f}'.format(
+        np.mean(result_dice) * 100, np.std(result_dice)))
