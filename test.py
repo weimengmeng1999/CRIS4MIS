@@ -34,6 +34,8 @@ def get_parser():
     args = parser.parse_args()
     assert args.config is not None
     cfg = config.load_cfg_from_cfg_file(args.config)
+    # add args to config.
+    cfg.__setattr__('only_pred_first_sent', args.only_pred_first_sent)
     if args.opts is not None:
         cfg = config.merge_cfg_from_list(cfg, args.opts)
     return cfg
