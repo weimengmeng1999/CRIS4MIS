@@ -6,8 +6,7 @@ import numpy as np
 
 class2sents = {
     'background': ['background', 'body tissues', 'organs'],
-    'instrument':
-    ['instrument', 'medical instrument', 'tool', 'medical tool'],
+    'instrument': ['instrument', 'medical instrument', 'tool', 'medical tool'],
     'shaft': [
         'shaft', 'instrument shaft', 'tool shaft', 'instrument body',
         'tool body', 'instrument handle', 'tool handle'
@@ -58,7 +57,11 @@ def get_one_sample(root_dir, image_file, image_path, save_dir, mask,
 
 def process(root_dir, cris_data_file):
     cris_data_list = []
-    for i in range(1, 9):
+    if 'train' in root_dir:
+        dataset_num = 8
+    elif 'test' in root_dir:
+        dataset_num = 10
+    for i in range(1, dataset_num + 1):
         image_dir = os.path.join(root_dir, 'instrument_dataset_{}'.format(i),
                                  'images')
         print('process: {} ...'.format(image_dir))
