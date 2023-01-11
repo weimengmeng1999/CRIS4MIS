@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --output=/jmain02/home/J2AD019/exk01/%u/logs/%j.out
-#SBATCH --job-name=cris
+#SBATCH --job-name=cris4mis
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=5
 #SBATCH --ntasks-per-node=8
