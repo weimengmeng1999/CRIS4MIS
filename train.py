@@ -135,7 +135,8 @@ def main_worker(gpu, args):
                                 data_file=args.train_data_file,
                                 mode='train',
                                 input_size=args.input_size,
-                                word_length=args.word_len)
+                                word_length=args.word_len,
+                                sents_select_type=args.sents_select_type)
     val_data = EndoVisDataset(data_root=args.test_data_root,
                               data_file=args.val_data_file,
                               mode='val',

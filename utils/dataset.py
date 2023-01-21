@@ -249,7 +249,13 @@ class EndoVisDataset(Dataset):
             'sents': [str, ...],
         }
     """
-    def __init__(self, data_root, data_file, mode, input_size, word_length):
+    def __init__(self,
+                 data_root,
+                 data_file,
+                 mode,
+                 input_size,
+                 word_length,
+                 sents_select_type='random'):
         super(EndoVisDataset, self).__init__()
         self.data_root = data_root
         self.data_file = data_file
@@ -257,6 +263,7 @@ class EndoVisDataset(Dataset):
         self.mode = mode
         self.input_size = (input_size, input_size)
         self.word_length = word_length
+        self.sents_select_type = sents_select_type
         self.mean = torch.tensor([0.48145466, 0.4578275,
                                   0.40821073]).reshape(3, 1, 1)
         self.std = torch.tensor([0.26862954, 0.26130258,
@@ -274,7 +281,13 @@ class EndoVisDataset(Dataset):
         # mask
         mask_path = os.path.join(self.data_root, ref['mask_path'])
         # sentences
-        idx = np.random.choice(ref['num_sents'])
+        if self.sents_select_type == 'random':
+            idx = np.random.choice(ref['num_sents'])
+        elif self.sents_select_type == 'first':
+            idx = 0
+        else:
+            assert False, 'Not support sents_select_type: {}'.format(
+                self.sents_select_type)
         sents = ref['sents']
         # transform
         mat, mat_inv = self.getTransformMat(img_size, True)
