@@ -37,10 +37,10 @@ def count_parameters(model):
 
 def main():
     # init arguments
-    args = get_parser()
+    cfgs = get_parser()
     torch.cuda.set_device(0)
     # create model
-    model, _ = build_segmenter(args)
+    model, _ = build_segmenter(cfgs)
     model = model.cuda()
     model.eval()
     # set cudnn state
@@ -49,7 +49,7 @@ def main():
     cudnn.enabled = True
     # init dummy tensor
     image = torch.randn(1, 3, 416, 416).cuda()
-    text = torch.randint(4096, size=(1, args.word_len)).long().cuda()
+    text = torch.randint(4096, size=(1, cfgs.word_len)).long().cuda()
     # init time & memory
     avg_time = 0
     avg_mem = 0

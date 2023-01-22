@@ -53,142 +53,142 @@ def get_parser():
 
 @logger.catch
 def main():
-    args = get_parser()
-    args.manual_seed = init_random_seed(args.manual_seed)
-    set_random_seed(args.manual_seed, deterministic=False)
+    cfgs = get_parser()
+    cfgs.manual_seed = init_random_seed(cfgs.manual_seed)
+    set_random_seed(cfgs.manual_seed, deterministic=False)
 
-    args.ngpus_per_node = torch.cuda.device_count()
-    args.world_size = args.ngpus_per_node * args.world_size
-    mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
+    cfgs.ngpus_per_node = torch.cuda.device_count()
+    cfgs.world_size = cfgs.ngpus_per_node * cfgs.world_size
+    mp.spawn(main_worker, nprocs=cfgs.ngpus_per_node, args=(cfgs, ))
     # for debug
-    # main_worker(0, args)
+    # main_worker(0, cfgs)
 
 
-def main_worker(gpu, args):
-    args.output_dir = os.path.join(args.output_folder, args.exp_name)
+def main_worker(gpu, cfgs):
+    cfgs.output_dir = os.path.join(cfgs.output_folder, cfgs.exp_name)
 
     # local rank & global rank
-    args.gpu = gpu
-    args.rank = args.rank * args.ngpus_per_node + gpu
-    torch.cuda.set_device(args.gpu)
+    cfgs.gpu = gpu
+    cfgs.rank = cfgs.rank * cfgs.ngpus_per_node + gpu
+    torch.cuda.set_device(cfgs.gpu)
 
     # logger
-    setup_logger(args.output_dir,
-                 distributed_rank=args.gpu,
+    setup_logger(cfgs.output_dir,
+                 distributed_rank=cfgs.gpu,
                  filename="train.log",
                  mode="a")
 
     # dist init
-    dist.init_process_group(backend=args.dist_backend,
-                            init_method=args.dist_url,
-                            world_size=args.world_size,
-                            rank=args.rank)
+    dist.init_process_group(backend=cfgs.dist_backend,
+                            init_method=cfgs.dist_url,
+                            world_size=cfgs.world_size,
+                            rank=cfgs.rank)
 
     # wandb
-    # if args.rank == 0:
+    # if cfgs.rank == 0:
     #     wandb.init(job_type="training",
     #                mode="online",
-    #                config=args,
+    #                config=cfgs,
     #                project="CRIS",
-    #                name=args.exp_name,
-    #                tags=[args.dataset, args.clip_pretrain])
+    #                name=cfgs.exp_name,
+    #                tags=[cfgs.dataset, cfgs.clip_pretrain])
     dist.barrier()
 
     # build model
-    model, param_list = build_segmenter(args)
-    if args.sync_bn:
+    model, param_list = build_segmenter(cfgs)
+    if cfgs.sync_bn:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     logger.info(model)
     model = nn.parallel.DistributedDataParallel(model.cuda(),
-                                                device_ids=[args.gpu],
+                                                device_ids=[cfgs.gpu],
                                                 find_unused_parameters=True)
 
     # build optimizer & lr scheduler
     optimizer = torch.optim.Adam(param_list,
-                                 lr=args.base_lr,
-                                 weight_decay=args.weight_decay)
+                                 lr=cfgs.base_lr,
+                                 weight_decay=cfgs.weight_decay)
     scheduler = MultiStepLR(optimizer,
-                            milestones=args.milestones,
-                            gamma=args.lr_decay)
+                            milestones=cfgs.milestones,
+                            gamma=cfgs.lr_decay)
     scaler = amp.GradScaler()
 
     # build dataset
-    args.batch_size = int(args.batch_size / args.ngpus_per_node)
-    args.batch_size_val = int(args.batch_size_val / args.ngpus_per_node)
-    args.workers = int(
-        (args.workers + args.ngpus_per_node - 1) / args.ngpus_per_node)
-    # train_data = RefDataset(lmdb_dir=args.train_lmdb,
-    #                         mask_dir=args.mask_root,
-    #                         dataset=args.dataset,
-    #                         split=args.train_split,
+    cfgs.batch_size = int(cfgs.batch_size / cfgs.ngpus_per_node)
+    cfgs.batch_size_val = int(cfgs.batch_size_val / cfgs.ngpus_per_node)
+    cfgs.workers = int(
+        (cfgs.workers + cfgs.ngpus_per_node - 1) / cfgs.ngpus_per_node)
+    # train_data = RefDataset(lmdb_dir=cfgs.train_lmdb,
+    #                         mask_dir=cfgs.mask_root,
+    #                         dataset=cfgs.dataset,
+    #                         split=cfgs.train_split,
     #                         mode='train',
-    #                         input_size=args.input_size,
-    #                         word_length=args.word_len)
-    # val_data = RefDataset(lmdb_dir=args.val_lmdb,
-    #                       mask_dir=args.mask_root,
-    #                       dataset=args.dataset,
-    #                       split=args.val_split,
+    #                         input_size=cfgs.input_size,
+    #                         word_length=cfgs.word_len)
+    # val_data = RefDataset(lmdb_dir=cfgs.val_lmdb,
+    #                       mask_dir=cfgs.mask_root,
+    #                       dataset=cfgs.dataset,
+    #                       split=cfgs.val_split,
     #                       mode='val',
-    #                       input_size=args.input_size,
-    #                       word_length=args.word_len)
-    train_data = EndoVisDataset(data_root=args.train_data_root,
-                                data_file=args.train_data_file,
+    #                       input_size=cfgs.input_size,
+    #                       word_length=cfgs.word_len)
+    train_data = EndoVisDataset(data_root=cfgs.train_data_root,
+                                data_file=cfgs.train_data_file,
                                 mode='train',
-                                input_size=args.input_size,
-                                word_length=args.word_len,
-                                sents_select_type=args.sents_select_type)
-    val_data = EndoVisDataset(data_root=args.test_data_root,
-                              data_file=args.val_data_file,
+                                input_size=cfgs.input_size,
+                                word_length=cfgs.word_len,
+                                sents_select_type=cfgs.sents_select_type)
+    val_data = EndoVisDataset(data_root=cfgs.test_data_root,
+                              data_file=cfgs.val_data_file,
                               mode='val',
-                              input_size=args.input_size,
-                              word_length=args.word_len)
+                              input_size=cfgs.input_size,
+                              word_length=cfgs.word_len)
 
     # build dataloader
     init_fn = partial(worker_init_fn,
-                      num_workers=args.workers,
-                      rank=args.rank,
-                      seed=args.manual_seed)
+                      num_workers=cfgs.workers,
+                      rank=cfgs.rank,
+                      seed=cfgs.manual_seed)
     train_sampler = data.distributed.DistributedSampler(train_data,
                                                         shuffle=True)
     val_sampler = data.distributed.DistributedSampler(val_data, shuffle=False)
     train_loader = data.DataLoader(train_data,
-                                   batch_size=args.batch_size,
+                                   batch_size=cfgs.batch_size,
                                    shuffle=False,
-                                   num_workers=args.workers,
+                                   num_workers=cfgs.workers,
                                    pin_memory=True,
                                    worker_init_fn=init_fn,
                                    sampler=train_sampler,
                                    drop_last=True)
     val_loader = data.DataLoader(val_data,
-                                 batch_size=args.batch_size_val,
+                                 batch_size=cfgs.batch_size_val,
                                  shuffle=False,
-                                 num_workers=args.workers_val,
+                                 num_workers=cfgs.workers_val,
                                  pin_memory=True,
                                  sampler=val_sampler,
                                  drop_last=False)
 
     best_IoU = 0.0
     # resume
-    if args.resume:
-        if os.path.isfile(args.resume):
-            logger.info("=> loading checkpoint '{}'".format(args.resume))
+    if cfgs.resume:
+        if os.path.isfile(cfgs.resume):
+            logger.info("=> loading checkpoint '{}'".format(cfgs.resume))
             checkpoint = torch.load(
-                args.resume, map_location=lambda storage: storage.cuda())
-            args.start_epoch = checkpoint['epoch']
+                cfgs.resume, map_location=lambda storage: storage.cuda())
+            cfgs.start_epoch = checkpoint['epoch']
             best_IoU = checkpoint["best_iou"]
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             scheduler.load_state_dict(checkpoint['scheduler'])
             logger.info("=> loaded checkpoint '{}' (epoch {})".format(
-                args.resume, checkpoint['epoch']))
+                cfgs.resume, checkpoint['epoch']))
         else:
             raise ValueError(
-                "=> resume failed! no checkpoint found at '{}'. Please check args.resume again!"
-                .format(args.resume))
+                "=> resume failed! no checkpoint found at '{}'. Please check cfgs.resume again!"
+                .format(cfgs.resume))
 
     # start training
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(cfgs.start_epoch, cfgs.epochs):
         epoch_log = epoch + 1
 
         # shuffle loader
@@ -196,14 +196,14 @@ def main_worker(gpu, args):
 
         # train
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log,
-              args)
+              cfgs)
 
         # evaluation
-        iou, prec_dict = validate(val_loader, model, epoch_log, args)
+        iou, prec_dict = validate(val_loader, model, epoch_log, cfgs)
 
         # save model
         if dist.get_rank() == 0:
-            lastname = os.path.join(args.output_dir, "last_model.pth")
+            lastname = os.path.join(cfgs.output_dir, "last_model.pth")
             torch.save(
                 {
                     'epoch': epoch_log,
@@ -216,7 +216,7 @@ def main_worker(gpu, args):
                 }, lastname)
             if iou >= best_IoU:
                 best_IoU = iou
-                bestname = os.path.join(args.output_dir, "best_model.pth")
+                bestname = os.path.join(cfgs.output_dir, "best_model.pth")
                 shutil.copyfile(lastname, bestname)
 
         # update lr

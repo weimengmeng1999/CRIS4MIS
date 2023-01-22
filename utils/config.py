@@ -59,7 +59,66 @@ class CfgNode(dict):
 
 
 def load_cfg_from_cfg_file(file):
-    cfg = {}
+    # pre-difined cfgs
+    cfg = {
+        # DATA
+        'dataset': 'endovis2017',
+        'train_data_file': 'cris_train.json',
+        'train_data_root': './EndoVis2017/cropped_train/',
+        'val_data_file': 'cris_test.json',
+        'val_data_root': './EndoVis2017/cropped_test/',
+        'sents_select_type': 'random',
+        # TRAIN
+        ## Base Arch
+        'clip_pretrain': 'pretrain/RN50.pt',
+        'input_size': 416,
+        'word_len': 17,
+        'word_dim': 1024,
+        'vis_dim': 512,
+        'fpn_in': [512, 1024, 1024],
+        'fpn_out': [256, 512, 1024],
+        'sync_bn': True,
+        ## Decoder
+        'num_layers': 3,
+        'num_head': 8,
+        'dim_ffn': 2048,
+        'dropout': 0.1,
+        'intermediate': False,
+        ## Training Setting
+        'workers': 8,  # data loader workers
+        'workers_val': 4,
+        'epochs': 50,
+        'milestones': [35],
+        'start_epoch': 0,
+        'batch_size': 64,  # batch size for training
+        # batch size for validation during training, memory and speed tradeoff
+        'batch_size_val': 64,
+        'base_lr': 0.0001,
+        'lr_decay': 0.1,
+        'lr_multi': 0.1,
+        'weight_decay': 0.,
+        'max_norm': 0.,
+        'manual_seed': 0,
+        'print_freq': 100,
+        ## Resume & Save
+        'exp_name': 'CRIS_R50',
+        'output_folder': 'exp/endovis2017',
+        'save_freq': 1,
+        'weight': None,  # path to initial weight (default: none)
+        'resume': None,  # path to latest checkpoint (default: none)
+        # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
+        'evaluate': True,
+        # Distributed
+        'dist_url': 'tcp://localhost:3681',
+        'dist_backend': 'nccl',
+        'multiprocessing_distributed': True,
+        'world_size': 1,
+        'rank': 0,
+        # TEST
+        'test_data_file': 'cris_test.json',
+        'test_data_root': './EndoVis2017/cropped_test/',
+        'visualize': False,
+    }
     assert os.path.isfile(file) and file.endswith('.yaml'), \
         '{} is not a yaml file'.format(file)
 
@@ -68,6 +127,8 @@ def load_cfg_from_cfg_file(file):
 
     for key in cfg_from_file:
         for k, v in cfg_from_file[key].items():
+            assert k in cfg.keys(), \
+                'config must be pre-defined, but get: {}'.format(k)
             cfg[k] = v
 
     cfg = CfgNode(cfg)

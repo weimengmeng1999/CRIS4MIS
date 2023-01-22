@@ -43,34 +43,34 @@ def get_parser():
 
 @logger.catch
 def main():
-    args = get_parser()
-    args.output_dir = os.path.join(args.output_folder, args.exp_name)
-    if args.visualize:
-        args.score_dir = os.path.join(args.output_dir, "score")
-        os.makedirs(args.score_dir, exist_ok=True)
-        args.vis_dir = os.path.join(args.output_dir, "test_vis")
-        os.makedirs(args.vis_dir, exist_ok=True)
+    cfgs = get_parser()
+    cfgs.output_dir = os.path.join(cfgs.output_folder, cfgs.exp_name)
+    if cfgs.visualize:
+        cfgs.score_dir = os.path.join(cfgs.output_dir, "score")
+        os.makedirs(cfgs.score_dir, exist_ok=True)
+        cfgs.vis_dir = os.path.join(cfgs.output_dir, "test_vis")
+        os.makedirs(cfgs.vis_dir, exist_ok=True)
 
     # logger
-    setup_logger(args.output_dir,
+    setup_logger(cfgs.output_dir,
                  distributed_rank=0,
                  filename="test.log",
                  mode="a")
-    logger.info(args)
+    logger.info(cfgs)
 
     # build dataset & dataloader
-    # test_data = RefDataset(lmdb_dir=args.test_lmdb,
-    #                        mask_dir=args.mask_root,
-    #                        dataset=args.dataset,
-    #                        split=args.test_split,
+    # test_data = RefDataset(lmdb_dir=cfgs.test_lmdb,
+    #                        mask_dir=cfgs.mask_root,
+    #                        dataset=cfgs.dataset,
+    #                        split=cfgs.test_split,
     #                        mode='test',
-    #                        input_size=args.input_size,
-    #                        word_length=args.word_len)
-    test_data = EndoVisDataset(data_root=args.test_data_root,
-                               data_file=args.test_data_file,
+    #                        input_size=cfgs.input_size,
+    #                        word_length=cfgs.word_len)
+    test_data = EndoVisDataset(data_root=cfgs.test_data_root,
+                               data_file=cfgs.test_data_file,
                                mode='test',
-                               input_size=args.input_size,
-                               word_length=args.word_len)
+                               input_size=cfgs.input_size,
+                               word_length=cfgs.word_len)
     test_loader = torch.utils.data.DataLoader(test_data,
                                               batch_size=1,
                                               shuffle=False,
@@ -78,23 +78,23 @@ def main():
                                               pin_memory=True)
 
     # build model
-    model, _ = build_segmenter(args)
+    model, _ = build_segmenter(cfgs)
     model = torch.nn.DataParallel(model).cuda()
     logger.info(model)
 
-    args.model_dir = os.path.join(args.output_dir, "best_model.pth")
-    if os.path.isfile(args.model_dir):
-        logger.info("=> loading checkpoint '{}'".format(args.model_dir))
-        checkpoint = torch.load(args.model_dir)
+    cfgs.model_dir = os.path.join(cfgs.output_dir, "best_model.pth")
+    if os.path.isfile(cfgs.model_dir):
+        logger.info("=> loading checkpoint '{}'".format(cfgs.model_dir))
+        checkpoint = torch.load(cfgs.model_dir)
         model.load_state_dict(checkpoint['state_dict'], strict=True)
-        logger.info("=> loaded checkpoint '{}'".format(args.model_dir))
+        logger.info("=> loaded checkpoint '{}'".format(cfgs.model_dir))
     else:
         raise ValueError(
-            "=> resume failed! no checkpoint found at '{}'. Please check args.resume again!"
-            .format(args.model_dir))
+            "=> resume failed! no checkpoint found at '{}'. Please check cfgs.resume again!"
+            .format(cfgs.model_dir))
 
     # inference
-    inference(test_loader, model, args)
+    inference(test_loader, model, cfgs)
 
 
 if __name__ == '__main__':

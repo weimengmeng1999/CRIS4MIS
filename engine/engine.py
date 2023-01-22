@@ -15,7 +15,7 @@ from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather,
                         trainMetricGPU)
 
 
-def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
+def train(train_loader, model, optimizer, scheduler, scaler, epoch, cfgs):
     batch_time = AverageMeter('Batch', ':2.2f')
     data_time = AverageMeter('Data', ':2.2f')
     lr = AverageMeter('Lr', ':1.6f')
@@ -25,7 +25,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     progress = ProgressMeter(
         len(train_loader),
         [batch_time, data_time, lr, loss_meter, iou_meter, pr_meter],
-        prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
+        prefix="Training: Epoch=[{}/{}] ".format(epoch, cfgs.epochs))
 
     model.train()
     time.sleep(2)
@@ -52,8 +52,8 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         # backward
         optimizer.zero_grad()
         scaler.scale(loss).backward()
-        if args.max_norm:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
+        if cfgs.max_norm:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfgs.max_norm)
         scaler.step(optimizer)
         scaler.update()
 
@@ -73,7 +73,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if (i + 1) % args.print_freq == 0:
+        if (i + 1) % cfgs.print_freq == 0:
             progress.display(i + 1)
             # if dist.get_rank() in [-1, 0]:
             #     wandb.log(
@@ -89,7 +89,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
 
 @torch.no_grad()
-def validate(val_loader, model, epoch, args):
+def validate(val_loader, model, epoch, cfgs):
     iou_list = []
     model.eval()
     time.sleep(2)
@@ -140,13 +140,13 @@ def validate(val_loader, model, epoch, args):
         prec[key] = value
         temp += "{}: {:.2f}  ".format(key, 100. * value)
     head = 'Evaluation: Epoch=[{}/{}]  IoU={:.2f}'.format(
-        epoch, args.epochs, 100. * iou.item())
+        epoch, cfgs.epochs, 100. * iou.item())
     logger.info(head + temp)
     return iou.item(), prec
 
 
 @torch.no_grad()
-def inference(test_loader, model, args):
+def inference(test_loader, model, cfgs):
     iou_list = []
     tbar = tqdm(test_loader, desc='Inference:', ncols=100)
     model.eval()
@@ -157,19 +157,19 @@ def inference(test_loader, model, args):
         mask = cv2.imread(param['mask_path'][0], flags=cv2.IMREAD_GRAYSCALE)
         mask = mask / 255.
         # dump image & mask
-        # if args.visualize:
+        # if cfgs.visualize:
         #     seg_id = param['seg_id'][0].cpu().numpy()
         #     img_name = '{}-img.jpg'.format(seg_id)
         #     mask_name = '{}-mask.png'.format(seg_id)
-        #     cv2.imwrite(filename=os.path.join(args.vis_dir, img_name),
+        #     cv2.imwrite(filename=os.path.join(cfgs.vis_dir, img_name),
         #                 img=param['ori_img'][0].cpu().numpy())
-        #     cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
+        #     cv2.imwrite(filename=os.path.join(cfgs.vis_dir, mask_name),
         #                 img=mask)
         # multiple sentences
         for sent_idx, sent in enumerate(param['sents']):
-            if args.only_pred_first_sent and (sent_idx != 0):
+            if cfgs.only_pred_first_sent and (sent_idx != 0):
                 continue
-            text = tokenize(sent, args.word_len, True)
+            text = tokenize(sent, cfgs.word_len, True)
             text = text.cuda(non_blocking=True)
             # inference
             pred = model(img, text)
@@ -183,7 +183,7 @@ def inference(test_loader, model, args):
             h, w = param['ori_size'].numpy()[0]
             mat = param['inverse'].numpy()[0]
             pred = pred.cpu().numpy()
-            if args.visualize:
+            if cfgs.visualize:
                 save_dict = {
                     'pred': copy.deepcopy(pred),
                     'mat': mat,
@@ -201,7 +201,7 @@ def inference(test_loader, model, args):
             iou = np.sum(inter) / (np.sum(union) + 1e-6)
             iou_list.append(iou)
             # dump prediction
-            if args.visualize:
+            if cfgs.visualize:
                 image_split = param['mask_path'][0].split('/')[-3]
                 image_id = param['mask_path'][0].split('/')[-1].split('_')[0]
                 seg_type = '_'.join(param['sents'][0][0].split(' '))
@@ -210,22 +210,22 @@ def inference(test_loader, model, args):
                 if sent_idx == 0:
                     score_name = 'score-{}-{}-{}.npz'.format(
                         image_split, image_id, seg_type, sent)
-                    np.savez_compressed(os.path.join(args.score_dir, score_name), **save_dict)
+                    np.savez_compressed(os.path.join(cfgs.score_dir, score_name), **save_dict)
 
                 pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.jpg'.format(
                     image_split, image_id, seg_type, iou * 100, sent)
-                if 'train' in args.test_data_root:
+                if 'train' in cfgs.test_data_root:
                     suffix = 'jpg'
-                elif 'test' in args.test_data_root:
+                elif 'test' in cfgs.test_data_root:
                     suffix = 'png'
-                image = cv2.imread(os.path.join(args.test_data_root, '{}/images/{}.{}'.format(
+                image = cv2.imread(os.path.join(cfgs.test_data_root, '{}/images/{}.{}'.format(
                         image_split, image_id, suffix)))
                 show = np.zeros(image.shape)
                 show[:, :, 0] = 255
                 pred = pred.astype(np.float64) * 0.5
                 vis_image = image * (1 - pred[:, :, None]) + \
                     show * pred[:, :, None]
-                cv2.imwrite(os.path.join(args.vis_dir, pred_name), vis_image)
+                cv2.imwrite(os.path.join(cfgs.vis_dir, pred_name), vis_image)
     logger.info('=> Metric Calculation <=')
     iou_list = np.stack(iou_list)
     iou_list = torch.from_numpy(iou_list).to(img.device)
