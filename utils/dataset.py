@@ -257,7 +257,8 @@ class EndoVisDataset(Dataset):
                  input_size,
                  word_length,
                  sents_select_type='random',
-                 use_vis_aug=False):
+                 use_vis_aug=False,
+                 use_vis_aug_non_rigid=False):
         super(EndoVisDataset, self).__init__()
         self.data_root = data_root
         self.data_file = data_file
@@ -267,6 +268,7 @@ class EndoVisDataset(Dataset):
         self.word_length = word_length
         self.sents_select_type = sents_select_type
         self.use_vis_aug = use_vis_aug
+        self.use_vis_aug_non_rigid = use_vis_aug_non_rigid
         self.mean = torch.tensor([0.48145466, 0.4578275,
                                   0.40821073]).reshape(3, 1, 1)
         self.std = torch.tensor([0.26862954, 0.26130258,
@@ -285,15 +287,15 @@ class EndoVisDataset(Dataset):
                         p=1),
                 A.HorizontalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
-                # A.OneOf([
-                #     A.ElasticTransform(alpha=120,
-                #                        sigma=120 * 0.05,
-                #                        alpha_affine=120 * 0.03,
-                #                        p=0.5),
-                #     A.GridDistortion(p=0.5),
-                #     A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=1)
-                # ],
-                #         p=0.8),
+                A.OneOf([
+                    A.ElasticTransform(alpha=120,
+                                       sigma=120 * 0.05,
+                                       alpha_affine=120 * 0.03,
+                                       p=0.5),
+                    A.GridDistortion(p=0.5),
+                    A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=1)
+                ],
+                        p=0.8 if self.use_vis_aug_non_rigid else 0),
                 A.CLAHE(p=0.8),
                 A.RandomBrightnessContrast(p=0.8),
                 A.RandomGamma(p=0.8),

@@ -138,7 +138,8 @@ def main_worker(gpu, cfgs):
                                 input_size=cfgs.input_size,
                                 word_length=cfgs.word_len,
                                 sents_select_type=cfgs.sents_select_type,
-                                use_vis_aug=cfgs.use_vis_aug)
+                                use_vis_aug=cfgs.use_vis_aug,
+                                use_vis_aug_non_rigid=cfgs.use_vis_aug_non_rigid)
     val_data = EndoVisDataset(data_root=cfgs.test_data_root,
                               data_file=cfgs.val_data_file,
                               mode='val',
