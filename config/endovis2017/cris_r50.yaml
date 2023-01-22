@@ -5,6 +5,8 @@ DATA:
   val_data_file: cris_test.json
   val_data_root: ./EndoVis2017/cropped_test/
   sents_select_type: "random"
+  use_vis_aug: False
+  use_vis_aug_non_rigid: False
 TRAIN:
   # Base Arch
   clip_pretrain: pretrain/RN50.pt
@@ -21,6 +23,10 @@ TRAIN:
   dim_ffn: 2048
   dropout: 0.1
   intermediate: False
+  # MaskIoU
+  pred_mask_iou: False
+  mask_iou_loss_type: "mse"
+  mask_iou_loss_weight: 1.0
   # Training Setting
   workers: 8  # data loader workers
   workers_val: 4

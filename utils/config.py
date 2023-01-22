@@ -86,6 +86,10 @@ def load_cfg_from_cfg_file(file):
         'dim_ffn': 2048,
         'dropout': 0.1,
         'intermediate': False,
+        ## MaskIoU
+        'pred_mask_iou': False,
+        'mask_iou_loss_type': 'mse',
+        'mask_iou_loss_weight': 1.0,
         ## Training Setting
         'workers': 8,  # data loader workers
         'workers_val': 4,

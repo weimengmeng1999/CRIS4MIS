@@ -307,3 +307,29 @@ class FPN(nn.Module):
         fq = self.coordconv(fq)
         # b, 512, 26, 26
         return fq
+
+
+class MaskIoUProjector(nn.Module):
+    def __init__(self, word_dim=1024, in_dim=512, out_dim=512):
+        super(MaskIoUProjector, self).__init__()
+        self.vis = nn.Linear(in_dim, out_dim)
+        self.txt = nn.Linear(word_dim, out_dim)
+        self.mask_iou = nn.Sequential(nn.Linear(out_dim * 2, out_dim),
+                                      nn.ReLU(),
+                                      nn.Linear(out_dim, out_dim // 2),
+                                      nn.ReLU(), nn.Linear(out_dim // 2, 1))
+
+    def forward(self, x, word):
+        '''
+            x: b, 512, 26, 26
+            word: b, 1024
+        '''
+        b, c, h, w = x.shape
+        x = torch.reshape(x, (b, c, -1))
+        x = x.mean(dim=2)
+        vis_feat = self.vis(x)
+        txt_feat = self.txt(word)
+        feat = torch.cat([vis_feat, txt_feat], dim=1)
+        mask_iou = self.mask_iou(feat)
+        mask_iou = mask_iou.reshape(-1)
+        return mask_iou

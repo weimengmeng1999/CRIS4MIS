@@ -47,7 +47,10 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, cfgs):
 
         # forward
         with amp.autocast():
-            pred, target, loss = model(image, text, target)
+            results = model(image, text, target)
+            pred = results['pred']
+            target = results['target']
+            loss = results['loss']
 
         # backward
         optimizer.zero_grad()
@@ -98,7 +101,8 @@ def validate(val_loader, model, epoch, cfgs):
         imgs = imgs.cuda(non_blocking=True)
         texts = texts.cuda(non_blocking=True)
         # inference
-        preds = model(imgs, texts)
+        results = model(imgs, texts)
+        preds = results['pred']
         preds = torch.sigmoid(preds)
         if preds.shape[-2:] != imgs.shape[-2:]:
             preds = F.interpolate(preds,
@@ -172,7 +176,8 @@ def inference(test_loader, model, cfgs):
             text = tokenize(sent, cfgs.word_len, True)
             text = text.cuda(non_blocking=True)
             # inference
-            pred = model(img, text)
+            results = model(img, text)
+            pred = results['pred']
             pred = torch.sigmoid(pred)
             if pred.shape[-2:] != img.shape[-2:]:
                 pred = F.interpolate(pred,
@@ -210,7 +215,8 @@ def inference(test_loader, model, cfgs):
                 if sent_idx == 0:
                     score_name = 'score-{}-{}-{}.npz'.format(
                         image_split, image_id, seg_type, sent)
-                    np.savez_compressed(os.path.join(cfgs.score_dir, score_name), **save_dict)
+                    np.savez_compressed(
+                        os.path.join(cfgs.score_dir, score_name), **save_dict)
 
                 pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.jpg'.format(
                     image_split, image_id, seg_type, iou * 100, sent)
@@ -218,8 +224,11 @@ def inference(test_loader, model, cfgs):
                     suffix = 'jpg'
                 elif 'test' in cfgs.test_data_root:
                     suffix = 'png'
-                image = cv2.imread(os.path.join(cfgs.test_data_root, '{}/images/{}.{}'.format(
-                        image_split, image_id, suffix)))
+                image = cv2.imread(
+                    os.path.join(
+                        cfgs.test_data_root,
+                        '{}/images/{}.{}'.format(image_split, image_id,
+                                                 suffix)))
                 show = np.zeros(image.shape)
                 show[:, :, 0] = 255
                 pred = pred.astype(np.float64) * 0.5

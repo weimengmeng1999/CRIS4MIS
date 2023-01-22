@@ -1,8 +1,8 @@
 from .segmenter import CRIS
 from loguru import logger
 
-# def build_segmenter(args):
-#     model = CRIS(args)
+# def build_segmenter(cfgs):
+#     model = CRIS(cfgs)
 #     backbone = []
 #     backbone_no_decay = []
 #     head = []
@@ -17,20 +17,20 @@ from loguru import logger
 #         len(backbone), len(backbone_no_decay), len(head)))
 #     param_list = [{
 #         'params': backbone,
-#         'initial_lr': args.lr_multi * args.base_lr
+#         'initial_lr': cfgs.lr_multi * cfgs.base_lr
 #     }, {
 #         'params': backbone_no_decay,
-#         'initial_lr': args.lr_multi * args.base_lr,
+#         'initial_lr': cfgs.lr_multi * cfgs.base_lr,
 #         'weight_decay': 0
 #     }, {
 #         'params': head,
-#         'initial_lr': args.base_lr
+#         'initial_lr': cfgs.base_lr
 #     }]
 #     return model, param_list
 
 
-def build_segmenter(args):
-    model = CRIS(args)
+def build_segmenter(cfgs):
+    model = CRIS(cfgs)
     backbone = []
     head = []
     for k, v in model.named_parameters():
@@ -41,9 +41,9 @@ def build_segmenter(args):
     logger.info('Backbone with decay={}, Head={}'.format(len(backbone), len(head)))
     param_list = [{
         'params': backbone,
-        'initial_lr': args.lr_multi * args.base_lr
+        'initial_lr': cfgs.lr_multi * cfgs.base_lr
     }, {
         'params': head,
-        'initial_lr': args.base_lr
+        'initial_lr': cfgs.base_lr
     }]
     return model, param_list
