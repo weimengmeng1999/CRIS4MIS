@@ -68,6 +68,7 @@ def load_cfg_from_cfg_file(file):
         'val_data_file': 'cris_test.json',
         'val_data_root': './EndoVis2017/cropped_test/',
         'sents_select_type': 'random',
+        'use_vis_aug': False,
         # TRAIN
         ## Base Arch
         'clip_pretrain': 'pretrain/RN50.pt',

@@ -59,9 +59,10 @@ def main():
 
     cfgs.ngpus_per_node = torch.cuda.device_count()
     cfgs.world_size = cfgs.ngpus_per_node * cfgs.world_size
-    mp.spawn(main_worker, nprocs=cfgs.ngpus_per_node, args=(cfgs, ))
-    # for debug
-    # main_worker(0, cfgs)
+    if cfgs.world_size == 1:
+        main_worker(0, cfgs)
+    else:
+        mp.spawn(main_worker, nprocs=cfgs.ngpus_per_node, args=(cfgs, ))
 
 
 def main_worker(gpu, cfgs):
@@ -136,7 +137,8 @@ def main_worker(gpu, cfgs):
                                 mode='train',
                                 input_size=cfgs.input_size,
                                 word_length=cfgs.word_len,
-                                sents_select_type=cfgs.sents_select_type)
+                                sents_select_type=cfgs.sents_select_type,
+                                use_vis_aug=cfgs.use_vis_aug)
     val_data = EndoVisDataset(data_root=cfgs.test_data_root,
                               data_file=cfgs.val_data_file,
                               mode='val',

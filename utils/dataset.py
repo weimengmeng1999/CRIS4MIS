@@ -6,6 +6,7 @@ import json
 import lmdb
 import numpy as np
 import pyarrow as pa
+import albumentations as A
 import torch
 from torch.utils.data import Dataset
 
@@ -255,7 +256,8 @@ class EndoVisDataset(Dataset):
                  mode,
                  input_size,
                  word_length,
-                 sents_select_type='random'):
+                 sents_select_type='random',
+                 use_vis_aug=False):
         super(EndoVisDataset, self).__init__()
         self.data_root = data_root
         self.data_file = data_file
@@ -264,10 +266,38 @@ class EndoVisDataset(Dataset):
         self.input_size = (input_size, input_size)
         self.word_length = word_length
         self.sents_select_type = sents_select_type
+        self.use_vis_aug = use_vis_aug
         self.mean = torch.tensor([0.48145466, 0.4578275,
                                   0.40821073]).reshape(3, 1, 1)
         self.std = torch.tensor([0.26862954, 0.26130258,
                                  0.27577711]).reshape(3, 1, 1)
+        if self.use_vis_aug:
+            self.transform = A.Compose([
+                A.OneOf([
+                    A.RandomSizedCrop(min_max_height=(int(
+                        input_size * 0.5), input_size),
+                                      height=input_size,
+                                      width=input_size,
+                                      p=0.5),
+                    A.PadIfNeeded(
+                        min_height=input_size, min_width=input_size, p=0.5)
+                ],
+                        p=1),
+                A.HorizontalFlip(p=0.5),
+                A.RandomRotate90(p=0.5),
+                # A.OneOf([
+                #     A.ElasticTransform(alpha=120,
+                #                        sigma=120 * 0.05,
+                #                        alpha_affine=120 * 0.03,
+                #                        p=0.5),
+                #     A.GridDistortion(p=0.5),
+                #     A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=1)
+                # ],
+                #         p=0.8),
+                A.CLAHE(p=0.8),
+                A.RandomBrightnessContrast(p=0.8),
+                A.RandomGamma(p=0.8),
+            ])
 
     def __len__(self):
         return len(self.data)
@@ -306,6 +336,11 @@ class EndoVisDataset(Dataset):
                                   flags=cv2.INTER_LINEAR,
                                   borderValue=0.)
             mask = mask / 255.
+            # do transform
+            if self.use_vis_aug:
+                transformed = self.transform(image=img, mask=mask)
+                img = transformed['image']
+                mask = transformed['mask']
             # sentence -> vector
             sent = sents[idx]
             word_vec = tokenize(sent, self.word_length, True).squeeze(0)
