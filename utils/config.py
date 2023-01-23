@@ -71,6 +71,7 @@ def load_cfg_from_cfg_file(file):
         'use_vis_aug': False,
         'use_vis_aug_non_rigid': False,
         # TRAIN
+        'freeze_modules': [],
         ## Base Arch
         'clip_pretrain': 'pretrain/RN50.pt',
         'input_size': 416,

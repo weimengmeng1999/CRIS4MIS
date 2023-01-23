@@ -99,6 +99,11 @@ def main_worker(gpu, cfgs):
     model, param_list = build_segmenter(cfgs)
     if cfgs.sync_bn:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    # freeze
+    for name in cfgs.freeze_modules:
+        for n, p in model.named_parameters():
+            if n.startswith(name) or n.startswith('module.{}'.format(name)):
+                p.requires_grad = False
     logger.info(model)
     model = nn.parallel.DistributedDataParallel(model.cuda(),
                                                 device_ids=[cfgs.gpu],
@@ -132,14 +137,15 @@ def main_worker(gpu, cfgs):
     #                       mode='val',
     #                       input_size=cfgs.input_size,
     #                       word_length=cfgs.word_len)
-    train_data = EndoVisDataset(data_root=cfgs.train_data_root,
-                                data_file=cfgs.train_data_file,
-                                mode='train',
-                                input_size=cfgs.input_size,
-                                word_length=cfgs.word_len,
-                                sents_select_type=cfgs.sents_select_type,
-                                use_vis_aug=cfgs.use_vis_aug,
-                                use_vis_aug_non_rigid=cfgs.use_vis_aug_non_rigid)
+    train_data = EndoVisDataset(
+        data_root=cfgs.train_data_root,
+        data_file=cfgs.train_data_file,
+        mode='train',
+        input_size=cfgs.input_size,
+        word_length=cfgs.word_len,
+        sents_select_type=cfgs.sents_select_type,
+        use_vis_aug=cfgs.use_vis_aug,
+        use_vis_aug_non_rigid=cfgs.use_vis_aug_non_rigid)
     val_data = EndoVisDataset(data_root=cfgs.test_data_root,
                               data_file=cfgs.val_data_file,
                               mode='val',
