@@ -169,6 +169,11 @@ def inference(test_loader, model, cfgs):
         #                 img=param['ori_img'][0].cpu().numpy())
         #     cv2.imwrite(filename=os.path.join(cfgs.vis_dir, mask_name),
         #                 img=mask)
+        if cfgs.visualize:
+            results_for_eval = dict()
+            results_for_eval['iou_list'] = []
+            results_for_eval['save_dict_list'] = []
+            results_for_eval['score_name_list'] = []
         # multiple sentences
         for sent_idx, sent in enumerate(param['sents']):
             if cfgs.only_pred_first_sent and (sent_idx != 0):
@@ -195,6 +200,7 @@ def inference(test_loader, model, cfgs):
                     'h': h,
                     'w': w,
                 }
+                results_for_eval['save_dict_list'].append(save_dict)
             pred = cv2.warpAffine(pred,
                                   mat, (w, h),
                                   flags=cv2.INTER_CUBIC,
@@ -212,12 +218,17 @@ def inference(test_loader, model, cfgs):
                 seg_type = '_'.join(param['sents'][0][0].split(' '))
                 sent = "_".join(sent[0].split(" "))
 
-                if sent_idx == 0:
-                    score_name = 'score-{}-{}-{}.npz'.format(
-                        image_split, image_id, seg_type, sent)
-                    np.savez_compressed(
-                        os.path.join(cfgs.score_dir, score_name), **save_dict)
+                # save results for eval
+                if cfgs.test_sents_type == 'use_best_sent_label':
+                    results_for_eval['iou_list'].append(iou)
+                elif cfgs.test_sents_type == 'use_best_sent_pred':
+                    results_for_eval['iou_list'].append(
+                        results['mask_iou_pred'].item())
+                score_name = 'score-{}-{}-{}.npz'.format(
+                    image_split, image_id, seg_type, sent)
+                results_for_eval['score_name_list'].append(score_name)
 
+                # save results for vis
                 pred_name = 'pred-{}-{}-{}-iou={:.2f}-{}.jpg'.format(
                     image_split, image_id, seg_type, iou * 100, sent)
                 if 'train' in cfgs.test_data_root:
@@ -235,6 +246,19 @@ def inference(test_loader, model, cfgs):
                 vis_image = image * (1 - pred[:, :, None]) + \
                     show * pred[:, :, None]
                 cv2.imwrite(os.path.join(cfgs.vis_dir, pred_name), vis_image)
+        if cfgs.visualize:
+            if cfgs.test_sents_type == 'use_class_name_sent':
+                score_name = results_for_eval['score_name_list'][0]
+                save_dict = results_for_eval['save_dict_list'][0]
+            elif cfgs.test_sents_type in [
+                    'use_best_sent_label', 'use_best_sent_pred'
+            ]:
+                best_idx = np.argmax(results_for_eval['iou_list'])
+                score_name = results_for_eval['score_name_list'][best_idx]
+                save_dict = results_for_eval['save_dict_list'][best_idx]
+            np.savez_compressed(os.path.join(cfgs.score_dir, score_name),
+                                **save_dict)
+
     logger.info('=> Metric Calculation <=')
     iou_list = np.stack(iou_list)
     iou_list = torch.from_numpy(iou_list).to(img.device)

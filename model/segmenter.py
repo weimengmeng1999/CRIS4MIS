@@ -27,6 +27,7 @@ class CRIS(nn.Module):
         # Projector
         self.proj = Projector(cfg.word_dim, cfg.vis_dim // 2, 3)
 
+        # Mask IoU Projector
         self.pred_mask_iou = cfg.pred_mask_iou
         self.mask_iou_loss_type = cfg.mask_iou_loss_type
         self.mask_iou_loss_weight = cfg.mask_iou_loss_weight

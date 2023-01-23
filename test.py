@@ -25,8 +25,10 @@ def get_parser():
                         default='path to xxx.yaml',
                         type=str,
                         help='config file')
-    parser.add_argument('--only_pred_first_sent',
-                        action='store_true')
+    parser.add_argument('--only_pred_first_sent', action='store_true')
+    parser.add_argument('--test_sents_type',
+                        default='use_class_name_sent',
+                        type=str)
     parser.add_argument('--opts',
                         default=None,
                         nargs=argparse.REMAINDER,
@@ -36,6 +38,7 @@ def get_parser():
     cfg = config.load_cfg_from_cfg_file(args.config)
     # add args to config.
     cfg.__setattr__('only_pred_first_sent', args.only_pred_first_sent)
+    cfg.__setattr__('test_sents_type', args.test_sents_type)
     if args.opts is not None:
         cfg = config.merge_cfg_from_list(cfg, args.opts)
     return cfg
