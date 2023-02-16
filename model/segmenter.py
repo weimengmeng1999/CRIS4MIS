@@ -43,6 +43,13 @@ class CRIS(nn.Module):
                 assert False, 'Not support mask_iou_loss_type: {}'.format(
                     self.mask_iou_loss_type)
 
+        # MoE
+        self.use_moe_select_best_sent = cfg.use_moe_select_best_sent
+        self.max_sent_num = cfg.max_sent_num
+        if self.use_moe_select_best_sent:
+            self.sent_selector = MaskIoUProjector(cfg.word_dim, cfg.vis_dim,
+                                                  cfg.vis_dim)
+
     def forward(self, img, word, mask=None):
         '''
             img: b, 3, h, w
@@ -56,20 +63,47 @@ class CRIS(nn.Module):
         # vis: C3 / C4 / C5
         # word: b, length, 1024
         # state: b, 1024
+        batch_size, _, img_h, img_w = img.shape
         vis = self.backbone.encode_image(img)
-        word, state = self.backbone.encode_text(word)
 
-        # b, 512, 26, 26 (C4)
-        if self.neck_with_text_state:
-            fq = self.neck(vis, state)
+        if self.use_moe_select_best_sent:
+            pred_all = img.new_zeros(
+                (batch_size, self.max_sent_num, img_h // 4, img_w // 4))
+            score_all = img.new_zeros((batch_size, self.max_sent_num))
+            for i_sent in range(self.max_sent_num):
+                f_word, state = self.backbone.encode_text(word[:, i_sent, :])
+                # b, 512, 26, 26 (C4)
+                if self.neck_with_text_state:
+                    fq = self.neck(vis, state)
+                else:
+                    fq = self.neck(vis)
+                b, c, h, w = fq.size()
+                fq = self.decoder(fq, f_word, pad_mask[:, i_sent, :])
+                fq = fq.reshape(b, c, h, w)
+                # b, 1, 104, 104
+                pred = self.proj(fq, state)
+                score = self.sent_selector(fq, state)
+                pred_all[:, i_sent:i_sent + 1] = pred
+                score_all[:, i_sent] = score
+            best_idx = torch.argmax(score_all, dim=1)  # b, 7
+            best_idx_oh = F.one_hot(best_idx, num_classes=self.max_sent_num)
+            pred_mask = torch.ones(
+                (batch_size, self.max_sent_num, img_h // 4, img_w // 4),
+                device=best_idx.device) * best_idx_oh[:, :, None, None]
+            pred = torch.masked_select(pred_all, pred_mask.bool()).reshape(
+                (batch_size, 1, img_h // 4, img_w // 4))
         else:
-            fq = self.neck(vis)
-        b, c, h, w = fq.size()
-        fq = self.decoder(fq, word, pad_mask)
-        fq = fq.reshape(b, c, h, w)
-
-        # b, 1, 104, 104
-        pred = self.proj(fq, state)
+            word, state = self.backbone.encode_text(word)
+            # b, 512, 26, 26 (C4)
+            if self.neck_with_text_state:
+                fq = self.neck(vis, state)
+            else:
+                fq = self.neck(vis)
+            b, c, h, w = fq.size()
+            fq = self.decoder(fq, word, pad_mask)
+            fq = fq.reshape(b, c, h, w)
+            # b, 1, 104, 104
+            pred = self.proj(fq, state)
 
         results = dict()
         results['pred'] = pred.detach()

@@ -250,25 +250,21 @@ class EndoVisDataset(Dataset):
             'sents': [str, ...],
         }
     """
-    def __init__(self,
-                 data_root,
-                 data_file,
-                 mode,
-                 input_size,
-                 word_length,
-                 sents_select_type='random',
-                 use_vis_aug=False,
-                 use_vis_aug_non_rigid=False):
+    def __init__(self, cfg, mode):
         super(EndoVisDataset, self).__init__()
-        self.data_root = data_root
-        self.data_file = data_file
-        self.data = json.load(open(os.path.join(data_root, data_file)))
+        self.data_root = cfg.get('{}_data_root'.format(mode))
+        self.data_file = cfg.get('{}_data_file'.format(mode))
+        self.data = json.load(
+            open(os.path.join(self.data_root, self.data_file)))
         self.mode = mode
-        self.input_size = (input_size, input_size)
-        self.word_length = word_length
-        self.sents_select_type = sents_select_type
-        self.use_vis_aug = use_vis_aug
-        self.use_vis_aug_non_rigid = use_vis_aug_non_rigid
+        input_size = cfg.input_size
+        self.input_size = (cfg.input_size, cfg.input_size)
+        self.word_length = cfg.word_len
+        self.sents_select_type = cfg.sents_select_type
+        self.use_vis_aug = cfg.use_vis_aug
+        self.use_vis_aug_non_rigid = cfg.use_vis_aug_non_rigid
+        self.use_moe_select_best_sent = cfg.use_moe_select_best_sent
+        self.max_sent_num = cfg.max_sent_num
         self.mean = torch.tensor([0.48145466, 0.4578275,
                                   0.40821073]).reshape(3, 1, 1)
         self.std = torch.tensor([0.26862954, 0.26130258,
@@ -344,14 +340,33 @@ class EndoVisDataset(Dataset):
                 img = transformed['image']
                 mask = transformed['mask']
             # sentence -> vector
-            sent = sents[idx]
-            word_vec = tokenize(sent, self.word_length, True).squeeze(0)
+            if self.use_moe_select_best_sent:
+                word_vec_list = []
+                random_sents = np.random.choice(sents,
+                                                self.max_sent_num,
+                                                replace=True)
+                for i_sent in range(self.max_sent_num):
+                    word_vec = tokenize(random_sents[i_sent], self.word_length,
+                                        True).squeeze(0)
+                    word_vec_list.append(word_vec)
+                word_vec = torch.stack(word_vec_list, dim=0)
+            else:
+                sent = sents[idx]
+                word_vec = tokenize(sent, self.word_length, True).squeeze(0)
             img, mask = self.convert(img, mask)
             return img, word_vec, mask
         elif self.mode == 'val':
             # sentence -> vector
-            sent = sents[0]
-            word_vec = tokenize(sent, self.word_length, True).squeeze(0)
+            if self.use_moe_select_best_sent:
+                word_vec_list = []
+                for i_sent in range(self.max_sent_num):
+                    word_vec = tokenize(sents[i_sent % len(sents)],
+                                        self.word_length, True).squeeze(0)
+                    word_vec_list.append(word_vec)
+                word_vec = torch.stack(word_vec_list, dim=0)
+            else:
+                sent = sents[0]
+                word_vec = tokenize(sent, self.word_length, True).squeeze(0)
             img = self.convert(img)[0]
             params = {
                 'mask_path': mask_path,

@@ -123,34 +123,8 @@ def main_worker(gpu, cfgs):
     cfgs.batch_size_val = int(cfgs.batch_size_val / cfgs.ngpus_per_node)
     cfgs.workers = int(
         (cfgs.workers + cfgs.ngpus_per_node - 1) / cfgs.ngpus_per_node)
-    # train_data = RefDataset(lmdb_dir=cfgs.train_lmdb,
-    #                         mask_dir=cfgs.mask_root,
-    #                         dataset=cfgs.dataset,
-    #                         split=cfgs.train_split,
-    #                         mode='train',
-    #                         input_size=cfgs.input_size,
-    #                         word_length=cfgs.word_len)
-    # val_data = RefDataset(lmdb_dir=cfgs.val_lmdb,
-    #                       mask_dir=cfgs.mask_root,
-    #                       dataset=cfgs.dataset,
-    #                       split=cfgs.val_split,
-    #                       mode='val',
-    #                       input_size=cfgs.input_size,
-    #                       word_length=cfgs.word_len)
-    train_data = EndoVisDataset(
-        data_root=cfgs.train_data_root,
-        data_file=cfgs.train_data_file,
-        mode='train',
-        input_size=cfgs.input_size,
-        word_length=cfgs.word_len,
-        sents_select_type=cfgs.sents_select_type,
-        use_vis_aug=cfgs.use_vis_aug,
-        use_vis_aug_non_rigid=cfgs.use_vis_aug_non_rigid)
-    val_data = EndoVisDataset(data_root=cfgs.test_data_root,
-                              data_file=cfgs.val_data_file,
-                              mode='val',
-                              input_size=cfgs.input_size,
-                              word_length=cfgs.word_len)
+    train_data = EndoVisDataset(cfgs, mode='train')
+    val_data = EndoVisDataset(cfgs, mode='val')
 
     # build dataloader
     init_fn = partial(worker_init_fn,

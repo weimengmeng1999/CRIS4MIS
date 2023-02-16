@@ -62,18 +62,7 @@ def main():
     logger.info(cfgs)
 
     # build dataset & dataloader
-    # test_data = RefDataset(lmdb_dir=cfgs.test_lmdb,
-    #                        mask_dir=cfgs.mask_root,
-    #                        dataset=cfgs.dataset,
-    #                        split=cfgs.test_split,
-    #                        mode='test',
-    #                        input_size=cfgs.input_size,
-    #                        word_length=cfgs.word_len)
-    test_data = EndoVisDataset(data_root=cfgs.test_data_root,
-                               data_file=cfgs.test_data_file,
-                               mode='test',
-                               input_size=cfgs.input_size,
-                               word_length=cfgs.word_len)
+    test_data = EndoVisDataset(cfgs, mode='test')
     test_loader = torch.utils.data.DataLoader(test_data,
                                               batch_size=1,
                                               shuffle=False,
