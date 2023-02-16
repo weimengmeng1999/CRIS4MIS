@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.clip import build_model
+from model.mae import MaskedAutoencoderViT
 
 from .layers import FPN, Projector, TransformerDecoder, MaskIoUProjector
 
@@ -49,6 +50,28 @@ class CRIS(nn.Module):
         if self.use_moe_select_best_sent:
             self.sent_selector = MaskIoUProjector(cfg.word_dim, cfg.vis_dim,
                                                   cfg.vis_dim)
+
+        # MAE
+        self.use_mae_gen_target_area = cfg.use_mae_gen_target_area
+        self.mae_pretrain = cfg.mae_pretrain
+        self.reconstruct_full_img = cfg.reconstruct_full_img
+        if self.use_mae_gen_target_area:
+            self.mae = MaskedAutoencoderViT(patch_size=16,
+                                            embed_dim=768,
+                                            depth=12,
+                                            num_heads=12,
+                                            decoder_embed_dim=512,
+                                            decoder_depth=8,
+                                            decoder_num_heads=16,
+                                            mlp_ratio=4)
+            if self.mae_pretrain is not None and self.mae_pretrain != '':
+                mae_state_dict = self.mae.state_dict()
+                pre_state_dict = torch.load(self.mae_pretrain,
+                                            map_location="cpu")
+                mae_state_dict.update(pre_state_dict['model'])
+                self.mae.load_state_dict(mae_state_dict)
+                print('load MAE pretrain model from {} successfully.'.format(
+                    self.mae_pretrain))
 
     def forward(self, img, word, mask=None):
         '''
@@ -130,6 +153,17 @@ class CRIS(nn.Module):
                 mask_iou_loss = self.mask_iou_loss(mask_iou_pred,
                                                    mask_iou_label)
                 loss = loss + mask_iou_loss * self.mask_iou_loss_weight
+
+            if self.use_mae_gen_target_area:
+                # (224, 224) same as original MAE
+                mae_img = F.interpolate(img, (224, 224),
+                                        mode='bilinear').detach()
+                if not self.reconstruct_full_img:
+                    mae_mask = F.interpolate(mask, (224, 224),
+                                             mode='nearest').detach()
+                    mae_img = mae_img * mae_mask
+                mae_loss, mae_pred, mae_mask = self.mae(mae_img)
+                loss = loss + mae_loss
 
             results['loss'] = loss
 

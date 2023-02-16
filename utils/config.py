@@ -96,6 +96,10 @@ def load_cfg_from_cfg_file(file):
         ## MoE
         'use_moe_select_best_sent': False,
         'max_sent_num': 7,
+        ## MAE
+        'use_mae_gen_target_area': False,
+        'mae_pretrain': 'pretrain/mae_pretrain_vit_base.pth',
+        'reconstruct_full_img': False,
         ## Training Setting
         'workers': 8,  # data loader workers
         'workers_val': 4,
