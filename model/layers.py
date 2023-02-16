@@ -279,15 +279,19 @@ class FPN(nn.Module):
             CoordConv(out_channels[1], out_channels[1], 3, 1),
             conv_layer(out_channels[1], out_channels[1], 3, 1))
 
-    def forward(self, imgs, state):
+    def forward(self, imgs, state=None):
         # v3, v4, v5: 256, 52, 52 / 512, 26, 26 / 1024, 13, 13
         v3, v4, v5 = imgs
         # fusion 1: b, 1024, 13, 13
-        # text projection: b, 1024 -> b, 1024
-        state = self.txt_proj(state).unsqueeze(-1).unsqueeze(
-            -1)  # b, 1024, 1, 1
-        f5 = self.f1_v_proj(v5)
-        f5 = self.norm_layer(f5 * state)
+        if state is not None:
+            # text projection: b, 1024 -> b, 1024
+            state = self.txt_proj(state).unsqueeze(-1).unsqueeze(
+                -1)  # b, 1024, 1, 1
+            f5 = self.f1_v_proj(v5)
+            f5 = self.norm_layer(f5 * state)
+        else:
+            f5 = self.f1_v_proj(v5)
+            f5 = self.norm_layer(f5)
         # fusion 2: b, 512, 26, 26
         f4 = self.f2_v_proj(v4)
         f5_ = F.interpolate(f5, scale_factor=2, mode='bilinear')

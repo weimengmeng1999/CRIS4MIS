@@ -16,6 +16,7 @@ class CRIS(nn.Module):
         self.backbone = build_model(clip_model.state_dict(),
                                     cfg.word_len).float()
         # Multi-Modal FPN
+        self.neck_with_text_state = cfg.neck_with_text_state
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
         # Decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,
@@ -59,7 +60,10 @@ class CRIS(nn.Module):
         word, state = self.backbone.encode_text(word)
 
         # b, 512, 26, 26 (C4)
-        fq = self.neck(vis, state)
+        if self.neck_with_text_state:
+            fq = self.neck(vis, state)
+        else:
+            fq = self.neck(vis)
         b, c, h, w = fq.size()
         fq = self.decoder(fq, word, pad_mask)
         fq = fq.reshape(b, c, h, w)

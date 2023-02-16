@@ -81,6 +81,8 @@ def load_cfg_from_cfg_file(file):
         'fpn_in': [512, 1024, 1024],
         'fpn_out': [256, 512, 1024],
         'sync_bn': True,
+        ## Neck
+        'neck_with_text_state': True,
         ## Decoder
         'num_layers': 3,
         'num_head': 8,
