@@ -47,9 +47,13 @@ class CRIS(nn.Module):
         # MoE
         self.use_moe_select_best_sent = cfg.use_moe_select_best_sent
         self.max_sent_num = cfg.max_sent_num
+        self.use_moe_consistency_loss = cfg.use_moe_consistency_loss
+        self.moe_consistency_loss_weight = cfg.moe_consistency_loss_weight
         if self.use_moe_select_best_sent:
             self.sent_selector = MaskIoUProjector(cfg.word_dim, cfg.vis_dim,
                                                   cfg.vis_dim)
+            if self.use_moe_consistency_loss:
+                self.moe_consistency_loss = nn.MSELoss()
 
         # MAE
         self.use_mae_gen_target_area = cfg.use_mae_gen_target_area
@@ -115,6 +119,18 @@ class CRIS(nn.Module):
                 device=best_idx.device) * best_idx_oh[:, :, None, None]
             pred = torch.masked_select(pred_all, pred_mask.bool()).reshape(
                 (batch_size, 1, img_h // 4, img_w // 4))
+            if self.training and self.use_moe_consistency_loss:
+                pred_all = pred_all.sigmoid()
+                moe_consistency_loss = img.new_zeros(
+                    (self.max_sent_num, self.max_sent_num))
+                for c_i in range(self.max_sent_num):
+                    for c_j in range(self.max_sent_num):
+                        if c_i == c_j:
+                            continue
+                        moe_consistency_loss[c_i,
+                                             c_j] = self.moe_consistency_loss(
+                                                 pred_all[:, c_i],
+                                                 pred_all[:, c_j])
         else:
             word, state = self.backbone.encode_text(word)
             # b, 512, 26, 26 (C4)
@@ -146,13 +162,17 @@ class CRIS(nn.Module):
             if self.pred_mask_iou:
                 # threshold = 0.35, same as test
                 pred_t = (pred.detach().reshape(
-                    (b, -1)) > 0.35).to(torch.float)
+                    (b, -1)).sigmoid() > 0.35).to(torch.float)
                 mask_t = (mask.detach().reshape((b, -1))).to(torch.float)
                 mask_iou_label = (pred_t * mask_t).sum(-1) / (
                     (pred_t + mask_t) > 0).sum(-1)
                 mask_iou_loss = self.mask_iou_loss(mask_iou_pred,
                                                    mask_iou_label)
                 loss = loss + mask_iou_loss * self.mask_iou_loss_weight
+
+            if self.use_moe_select_best_sent and self.use_moe_consistency_loss:
+                loss = loss + moe_consistency_loss.mean(
+                ) * self.moe_consistency_loss_weight
 
             if self.use_mae_gen_target_area:
                 # (224, 224) same as original MAE

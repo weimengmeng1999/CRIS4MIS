@@ -96,6 +96,8 @@ def load_cfg_from_cfg_file(file):
         ## MoE
         'use_moe_select_best_sent': False,
         'max_sent_num': 7,
+        'use_moe_consistency_loss': False,
+        'moe_consistency_loss_weight': 1.0,
         ## MAE
         'use_mae_gen_target_area': False,
         'mae_pretrain': 'pretrain/mae_pretrain_vit_base.pth',
