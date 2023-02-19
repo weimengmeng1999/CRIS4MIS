@@ -182,10 +182,11 @@ def inference(test_loader, model, cfgs):
                 assert cfgs.only_pred_first_sent
                 text_list = []
                 for i_sent in range(cfgs.max_sent_num):
-                    text = tokenize(param['sents'][i_sent %
-                                                   len(param['sents'])])
+                    text = tokenize(
+                        param['sents'][i_sent % len(param['sents'])],
+                        cfgs.word_len).squeeze(0)
                     text_list.append(text)
-                text = torch.stack(text_list, dim=0)
+                text = torch.stack(text_list, dim=0).unsqueeze(0)
             else:
                 text = tokenize(sent, cfgs.word_len, True)
             text = text.cuda(non_blocking=True)
