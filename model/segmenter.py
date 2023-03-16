@@ -59,6 +59,7 @@ class CRIS(nn.Module):
         self.use_mae_gen_target_area = cfg.use_mae_gen_target_area
         self.mae_pretrain = cfg.mae_pretrain
         self.reconstruct_full_img = cfg.reconstruct_full_img
+        self.mae_hard_example_mining_type = cfg.mae_hard_example_mining_type
         if self.use_mae_gen_target_area:
             self.mae = MaskedAutoencoderViT(patch_size=16,
                                             embed_dim=768,
@@ -182,7 +183,22 @@ class CRIS(nn.Module):
                     mae_mask = F.interpolate(mask, (224, 224),
                                              mode='nearest').detach()
                     mae_img = mae_img * mae_mask
-                mae_loss, mae_pred, mae_mask = self.mae(mae_img)
+                if self.mae_hard_example_mining_type is not None:
+                    pred_t = (pred.detach().sigmoid() > 0.35).to(torch.int32)
+                    mask_t = mask.detach().to(torch.int32)
+                    if self.mae_hard_example_mining_type == 'v0':
+                        mae_hard_example = torch.logical_xor(pred_t, mask_t)
+                    elif self.mae_hard_example_mining_type == 'v1':
+                        pred_t = torch.where(mask < 0.5, 0, pred_t)
+                        mae_hard_example = torch.logical_xor(pred_t, mask_t)
+                    mae_hard_example = mae_hard_example.to(torch.float32)
+                    mae_hard_example = F.interpolate(mae_hard_example,
+                                                     (224, 224),
+                                                     mode='nearest').detach()
+                else:
+                    mae_hard_example = None
+                mae_loss, mae_pred, mae_mask = self.mae(
+                    mae_img, hard_example=mae_hard_example)
                 loss = loss + mae_loss
 
             results['loss'] = loss

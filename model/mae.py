@@ -42,6 +42,8 @@ class MaskedAutoencoderViT(nn.Module):
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans,
                                       embed_dim)
         num_patches = self.patch_embed.num_patches
+        self.patch_embed_for_hard_example = PatchEmbedForHardExample(
+            img_size, patch_size)
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(
@@ -182,7 +184,41 @@ class MaskedAutoencoderViT(nn.Module):
 
         return x_masked, mask, ids_restore
 
-    def forward_encoder(self, x, mask_ratio):
+    def hard_example_mining_masking(self, x, mask_ratio, hard_example):
+        '''
+        hard_example has same shape with x.
+        '''
+        hard_example = self.patch_embed_for_hard_example(hard_example)
+        hard_example = hard_example.squeeze(-1)
+
+        N, L, D = x.shape  # batch, length, dim
+        len_keep = int(L * (1 - mask_ratio))
+
+        noise = torch.rand(N, L, device=x.device)  # noise in [0, 1]
+        noise_plus = torch.rand(N, L, device=x.device)
+        noise = torch.where(hard_example > 0.5, torch.ones_like(noise), noise) + \
+            torch.where(hard_example < 0.5, torch.zeros_like(noise_plus), noise_plus)
+
+        # sort noise for each sample
+        ids_shuffle = torch.argsort(
+            noise, dim=1)  # ascend: small is keep, large is remove
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+        # keep the first subset
+        ids_keep = ids_shuffle[:, :len_keep]
+        x_masked = torch.gather(x,
+                                dim=1,
+                                index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
+
+        # generate the binary mask: 0 is keep, 1 is remove
+        mask = torch.ones([N, L], device=x.device)
+        mask[:, :len_keep] = 0
+        # unshuffle to get the binary mask
+        mask = torch.gather(mask, dim=1, index=ids_restore)
+
+        return x_masked, mask, ids_restore
+
+    def forward_encoder(self, x, mask_ratio, hard_example=None):
         # embed patches
         x = self.patch_embed(x)
 
@@ -190,7 +226,11 @@ class MaskedAutoencoderViT(nn.Module):
         x = x + self.pos_embed[:, 1:, :]
 
         # masking: length -> length * mask_ratio
-        x, mask, ids_restore = self.random_masking(x, mask_ratio)
+        if hard_example is not None:
+            x, mask, ids_restore = self.hard_example_mining_masking(
+                x, mask_ratio, hard_example)
+        else:
+            x, mask, ids_restore = self.random_masking(x, mask_ratio)
 
         # append cls token
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
@@ -252,8 +292,9 @@ class MaskedAutoencoderViT(nn.Module):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
-    def forward(self, imgs, mask_ratio=0.75):
-        latent, mask, ids_restore = self.forward_encoder(imgs, mask_ratio)
+    def forward(self, imgs, mask_ratio=0.75, hard_example=None):
+        latent, mask, ids_restore = self.forward_encoder(
+            imgs, mask_ratio, hard_example)
         pred = self.forward_decoder(latent, ids_restore)  # [N, L, p*p*3]
         loss = self.forward_loss(imgs, pred, mask)
         return loss, pred, mask
@@ -305,3 +346,31 @@ def mae_vit_huge_patch14_dec512d8b(**kwargs):
 mae_vit_base_patch16 = mae_vit_base_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
 mae_vit_large_patch16 = mae_vit_large_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
 mae_vit_huge_patch14 = mae_vit_huge_patch14_dec512d8b  # decoder: 512 dim, 8 blocks
+
+
+class PatchEmbedForHardExample(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, flatten=True):
+        super().__init__()
+        img_size = (img_size, img_size)
+        patch_size = (patch_size, patch_size)
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.grid_size = (img_size[0] // patch_size[0],
+                          img_size[1] // patch_size[1])
+        self.num_patches = self.grid_size[0] * self.grid_size[1]
+        self.flatten = flatten
+
+        self.proj = nn.MaxPool2d(kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, hard_example):
+        B, C, H, W = hard_example.shape
+        assert C == 1, "Input channel must be 1."
+        assert H == self.img_size[
+            0], f"Input image height ({H}) doesn't match model ({self.img_size[0]})."
+        assert W == self.img_size[
+            1], f"Input image width ({W}) doesn't match model ({self.img_size[1]})."
+        hard_example = self.proj(hard_example)
+        if self.flatten:
+            hard_example = hard_example.flatten(2).transpose(1,
+                                                             2)  # BCHW -> BNC
+        return hard_example
