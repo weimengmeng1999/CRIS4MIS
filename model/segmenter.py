@@ -189,7 +189,8 @@ class CRIS(nn.Module):
                     if self.mae_hard_example_mining_type == 'v0':
                         mae_hard_example = torch.logical_xor(pred_t, mask_t)
                     elif self.mae_hard_example_mining_type == 'v1':
-                        pred_t = torch.where(mask < 0.5, 0, pred_t)
+                        pred_t = torch.where(mask < 0.5,
+                                             torch.zeros_like(pred_t), pred_t)
                         mae_hard_example = torch.logical_xor(pred_t, mask_t)
                     mae_hard_example = mae_hard_example.to(torch.float32)
                     mae_hard_example = F.interpolate(mae_hard_example,
