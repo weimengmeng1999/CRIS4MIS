@@ -1,5 +1,5 @@
 test_dataset="test"
-exp_tag="v1_0"
+exp_tag=$1
 test_path=/jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/EndoVis2017/cropped_${test_dataset}
 pred_path=/jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/CRIS/exp/endovis2017/${exp_tag}/score
 
