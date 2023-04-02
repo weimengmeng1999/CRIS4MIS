@@ -1,5 +1,9 @@
 test_dataset="test"
 exp_tag=$1
+# Create
+# test_path=/scratch/grp/grv_shi/cambridge-1/data/EndoVis2017/cropped_${test_dataset}
+# pred_path=/scratch/grp/grv_shi/cambridge-1/exp/endovis2017/${exp_tag}/score
+# Jade2
 test_path=/jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/EndoVis2017/cropped_${test_dataset}
 pred_path=/jmain02/home/J2AD019/exk01/zxz35-exk01/data/cambridge-1/CRIS/exp/endovis2017/${exp_tag}/score
 
