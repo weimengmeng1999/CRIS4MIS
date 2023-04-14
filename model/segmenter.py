@@ -95,6 +95,7 @@ class CRIS(nn.Module):
         vis = self.backbone.encode_image(img)
 
         if self.use_moe_select_best_sent:
+            # 有待优化
             pred_all = img.new_zeros(
                 (batch_size, self.max_sent_num, img_h // 4, img_w // 4))
             score_all = img.new_zeros((batch_size, self.max_sent_num))
@@ -203,5 +204,41 @@ class CRIS(nn.Module):
                 loss = loss + mae_loss
 
             results['loss'] = loss
+        else:
+            if self.use_mae_gen_target_area:
+                # (224, 224) same as original MAE
+                mae_img = F.interpolate(img, (224, 224),
+                                        mode='bilinear').detach()
+                # if not self.reconstruct_full_img:
+                #     pred_mask_t = (pred.detach().sigmoid() > 0.35).to(
+                #         torch.float32)
+                #     pred_mask_t = F.interpolate(pred_mask_t, (224, 224),
+                #                                 mode='nearest').detach()
+                #     mae_img = mae_img * pred_mask_t
+                mae_loss, mae_pred, mae_mask = self.mae(mae_img)
+
+                # visualize MAE
+                # 1. visualize the pred img
+                mae_pred = self.mae.unpatchify(mae_pred)
+                mae_pred = torch.einsum('nchw->nhwc', mae_pred).detach()
+                # 2. visualize the mask
+                mae_mask = mae_mask.detach()
+                mae_mask = mae_mask.unsqueeze(-1).repeat(
+                    1, 1, self.mae.patch_embed.patch_size[0]**2 *
+                    3)  # (N, H*W, p*p*3)
+                mae_mask = self.mae.unpatchify(
+                    mae_mask)  # 1 is removing, 0 is keeping
+                mae_mask = torch.einsum('nchw->nhwc', mae_mask).detach()
+                # 3. original img
+                mae_img = torch.einsum('nchw->nhwc', mae_img)
+                # 4. masked img
+                masked_mae_img = mae_img * (1 - mae_mask)
+                # mae reconstruction pasted with visible patches
+                mae_img_paste = mae_img * (1 - mae_mask) + mae_pred * mae_mask
+
+                results['mae_img'] = mae_img
+                results['mased_mae_img'] = masked_mae_img
+                results['mae_pred'] = mae_pred
+                results['mae_img_paste'] = mae_img_paste
 
         return results

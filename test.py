@@ -53,6 +53,8 @@ def main():
         os.makedirs(cfgs.score_dir, exist_ok=True)
         cfgs.vis_dir = os.path.join(cfgs.output_dir, "test_vis")
         os.makedirs(cfgs.vis_dir, exist_ok=True)
+        cfgs.mae_vis_dir = os.path.join(cfgs.output_dir, "mae_vis")
+        os.makedirs(cfgs.mae_vis_dir, exist_ok=True)
 
     # logger
     setup_logger(cfgs.output_dir,

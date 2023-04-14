@@ -256,6 +256,21 @@ def inference(test_loader, model, cfgs):
                 vis_image = image * (1 - pred[:, :, None]) + \
                     show * pred[:, :, None]
                 cv2.imwrite(os.path.join(cfgs.vis_dir, pred_name), vis_image)
+                if cfgs.use_mae_gen_target_area:
+                    mae_img = results['mae_img']
+                    masked_mae_img = results['mased_mae_img']
+                    mae_pred = results['mae_pred']
+                    mae_img_paste = results['mae_img_paste']
+                    mae_path = os.path.join(
+                        cfgs.mae_vis_dir,
+                        'mae-{}-{}-{}-'.format(image_split, image_id,
+                                               seg_type))
+                    save_img(mae_img[0], mae_path + 'original.jpg')
+                    save_img(masked_mae_img[0], mae_path + 'masked.jpg')
+                    save_img(mae_pred[0], mae_path + 'reconstruct.jpg')
+                    save_img(mae_img_paste[0],
+                             mae_path + 'reconstruct_paste.jpg')
+
         if cfgs.visualize:
             if cfgs.test_sents_type == 'use_class_name_sent':
                 score_name = results_for_eval['score_name_list'][0]
@@ -287,3 +302,14 @@ def inference(test_loader, model, cfgs):
         logger.info('{}: {:.2f}.'.format(k, 100. * v))
 
     return iou.item(), prec
+
+
+def save_img(image, save_path):
+    if image.is_cuda:
+        image = image.cpu()
+    imagenet_mean = np.array([0.485, 0.456, 0.406])
+    imagenet_std = np.array([0.229, 0.224, 0.225])
+    image = torch.clip((image * imagenet_std + imagenet_mean) * 255, 0,
+                       255).int().numpy()
+    image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2BGR)
+    cv2.imwrite(save_path, image)
