@@ -58,6 +58,7 @@ class CRIS(nn.Module):
         # MAE
         self.use_mae_gen_target_area = cfg.use_mae_gen_target_area
         self.mae_pretrain = cfg.mae_pretrain
+        self.mae_mask_ratio = cfg.mae_mask_ratio
         self.reconstruct_full_img = cfg.reconstruct_full_img
         self.mae_hard_example_mining_type = cfg.mae_hard_example_mining_type
         self.mae_shared_encoder = cfg.mae_shared_encoder
@@ -237,6 +238,7 @@ class CRIS(nn.Module):
                 #     mae_img = mae_img * pred_mask_t
                 mae_encoder = self.backbone.visual.transformer if self.mae_shared_encoder else None
                 mae_loss, mae_pred, mae_mask = self.mae(mae_img,
+                                                        mask_ratio=self.mae_mask_ratio,
                                                         encoder=mae_encoder)
 
                 # visualize MAE
