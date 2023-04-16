@@ -103,6 +103,7 @@ def load_cfg_from_cfg_file(file):
         'mae_pretrain': 'pretrain/mae_pretrain_vit_base.pth',
         'reconstruct_full_img': False,
         'mae_hard_example_mining_type': None,
+        'mae_shared_encoder': False,
         ## Training Setting
         'workers': 8,  # data loader workers
         'workers_val': 4,

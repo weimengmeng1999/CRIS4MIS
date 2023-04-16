@@ -218,7 +218,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         return x_masked, mask, ids_restore
 
-    def forward_encoder(self, x, mask_ratio, hard_example=None):
+    def forward_encoder(self, x, mask_ratio, hard_example=None, encoder=None):
         # embed patches
         x = self.patch_embed(x)
 
@@ -237,10 +237,13 @@ class MaskedAutoencoderViT(nn.Module):
         cls_tokens = cls_token.expand(x.shape[0], -1, -1)
         x = torch.cat((cls_tokens, x), dim=1)
 
-        # apply Transformer blocks
-        for blk in self.blocks:
-            x = blk(x)
-        x = self.norm(x)
+        if encoder is not None:
+            x = encoder(x)
+        else:
+            # apply Transformer blocks
+            for blk in self.blocks:
+                x = blk(x)
+            x = self.norm(x)
 
         return x, mask, ids_restore
 
@@ -292,9 +295,9 @@ class MaskedAutoencoderViT(nn.Module):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
-    def forward(self, imgs, mask_ratio=0.75, hard_example=None):
+    def forward(self, imgs, mask_ratio=0.75, hard_example=None, encoder=None):
         latent, mask, ids_restore = self.forward_encoder(
-            imgs, mask_ratio, hard_example)
+            imgs, mask_ratio, hard_example, encoder)
         pred = self.forward_decoder(latent, ids_restore)  # [N, L, p*p*3]
         loss = self.forward_loss(imgs, pred, mask)
         return loss, pred, mask
