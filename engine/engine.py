@@ -225,8 +225,8 @@ def inference(test_loader, model, cfgs):
             if cfgs.visualize:
                 image_split = param['mask_path'][0].split('/')[-3]
                 image_id = param['mask_path'][0].split('/')[-1].split('_')[0]
-                seg_type = '_'.join(param['sents'][0][0].split(' '))
-                sent = "_".join(sent[0].split(" "))
+                seg_type = '_'.join(param['sents'][0][0].split(' ')[:5])
+                sent = "_".join(sent[0].split(" ")[:5])
 
                 # save results for eval
                 if cfgs.test_sents_type == 'use_best_sent_label':
