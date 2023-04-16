@@ -306,6 +306,26 @@ class VisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
+        # output channel is same as Resnet-50.
+        self.up_scale = nn.Conv2d(output_dim, 512, kernel_size=1)
+        self.keep_scale = nn.Conv2d(output_dim, 1024, kernel_size=1)
+        self.down_scale = nn.Conv2d(output_dim, 1024, kernel_size=1)
+
+    def resize_pos_embed(self, pos_embed, size):
+        """Resize pos_embed weights.
+        Resize pos_embed using linear interpolate method.
+        """
+        if pos_embed.ndim == 2:
+            pos_embed = pos_embed.unsqueeze(0)
+        assert pos_embed.ndim == 3, 'shape of pos_embed must be [B, L, C]'
+        pos_embed = pos_embed.transpose(1, 2)
+        pos_embed = F.interpolate(pos_embed,
+                                  size=size,
+                                  align_corners=False,
+                                  mode='linear')
+        pos_embed = pos_embed.transpose(1, 2)
+        return pos_embed
+
     def forward(self, x: torch.Tensor):
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1],
@@ -316,7 +336,9 @@ class VisionTransformer(nn.Module):
                 x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x
         ],
                       dim=1)  # shape = [*, grid ** 2 + 1, width]
-        x = x + self.positional_embedding.to(x.dtype)
+        N, L, C = x.shape
+        pos_embed = self.resize_pos_embed(self.positional_embedding, size=L)
+        x = x + pos_embed.to(x.dtype)
         x = self.ln_pre(x)
 
         x = x.permute(1, 0, 2)  # NLD -> LND
@@ -329,7 +351,19 @@ class VisionTransformer(nn.Module):
         if self.proj is not None:
             x = x @ self.proj
 
-        return x
+        N, L, C = x.shape
+        patch_size = int(L**0.5)
+        x = x.transpose(1, 2).reshape((N, C, patch_size, patch_size))
+        x_up = F.interpolate(x,
+                             size=(patch_size * 2, patch_size * 2),
+                             mode='bilinear')
+        x_down = F.interpolate(x,
+                               size=(patch_size // 2, patch_size // 2),
+                               mode='bilinear')
+        x_up = self.up_scale(x_up)
+        x = self.keep_scale(x)
+        x_down = self.down_scale(x_down)
+        return (x_up, x, x_down)
 
 
 class CLIP(nn.Module):
@@ -383,6 +417,8 @@ class CLIP(nn.Module):
         self.text_projection = nn.Parameter(
             torch.empty(transformer_width, embed_dim))
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        # output channel is same as Resnet-50.
+        self.text_state_proj = nn.Linear(embed_dim, 1024)
 
         self.token_embedding.requires_grad_ = False
         self.initialize_parameters()
@@ -450,6 +486,7 @@ class CLIP(nn.Module):
         # take features from the eot embedding (eot_token is the highest number in each sequence)
         state = x[torch.arange(x.shape[0]),
                   text.argmax(dim=-1)] @ self.text_projection
+        state = self.text_state_proj(state)
         # x = x @ self.text_projection
         # state = x[torch.arange(x.shape[0]), text.argmax(dim=-1)]
 
