@@ -101,6 +101,7 @@ def load_cfg_from_cfg_file(file):
         ## MAE
         'use_mae_gen_target_area': False,
         'mae_pretrain': 'pretrain/mae_pretrain_vit_base.pth',
+        'mae_input_shape': (224, 224),
         'mae_mask_ratio': 0.75,
         'reconstruct_full_img': False,
         'mae_hard_example_mining_type': None,

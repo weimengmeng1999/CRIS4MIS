@@ -58,6 +58,7 @@ class CRIS(nn.Module):
         # MAE
         self.use_mae_gen_target_area = cfg.use_mae_gen_target_area
         self.mae_pretrain = cfg.mae_pretrain
+        self.mae_input_shape = cfg.mae_input_shape
         self.mae_mask_ratio = cfg.mae_mask_ratio
         self.reconstruct_full_img = cfg.reconstruct_full_img
         self.mae_hard_example_mining_type = cfg.mae_hard_example_mining_type
@@ -195,11 +196,10 @@ class CRIS(nn.Module):
                 ) * self.moe_consistency_loss_weight
 
             if self.use_mae_gen_target_area:
-                # (224, 224) same as original MAE
-                mae_img = F.interpolate(img, (224, 224),
+                mae_img = F.interpolate(img, self.mae_input_shape,
                                         mode='bilinear').detach()
                 if not self.reconstruct_full_img:
-                    mae_mask = F.interpolate(mask, (224, 224),
+                    mae_mask = F.interpolate(mask, self.mae_input_shape,
                                              mode='nearest').detach()
                     mae_img = mae_img * mae_mask
                 if self.mae_hard_example_mining_type is not None:
@@ -213,7 +213,7 @@ class CRIS(nn.Module):
                         mae_hard_example = torch.logical_xor(pred_t, mask_t)
                     mae_hard_example = mae_hard_example.to(torch.float32)
                     mae_hard_example = F.interpolate(mae_hard_example,
-                                                     (224, 224),
+                                                     self.mae_input_shape,
                                                      mode='nearest').detach()
                 else:
                     mae_hard_example = None
@@ -227,13 +227,12 @@ class CRIS(nn.Module):
             results['loss'] = loss
         else:
             if self.use_mae_gen_target_area:
-                # (224, 224) same as original MAE
-                mae_img = F.interpolate(img, (224, 224),
+                mae_img = F.interpolate(img, self.mae_input_shape,
                                         mode='bilinear').detach()
                 # if not self.reconstruct_full_img:
                 #     pred_mask_t = (pred.detach().sigmoid() > 0.35).to(
                 #         torch.float32)
-                #     pred_mask_t = F.interpolate(pred_mask_t, (224, 224),
+                #     pred_mask_t = F.interpolate(pred_mask_t, self.mae_input_shape,
                 #                                 mode='nearest').detach()
                 #     mae_img = mae_img * pred_mask_t
                 mae_encoder = self.backbone.visual.transformer if self.mae_shared_encoder else None
