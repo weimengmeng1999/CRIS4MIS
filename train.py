@@ -6,6 +6,7 @@ import sys
 import time
 import warnings
 from functools import partial
+from prettytable import PrettyTable
 
 import cv2
 import torch
@@ -105,6 +106,11 @@ def main_worker(gpu, cfgs):
             if n.startswith(name) or n.startswith('module.{}'.format(name)):
                 p.requires_grad = False
     logger.info(model)
+    table = PrettyTable(['Name', 'Shape', 'ReqGrad'])
+    for n, p in model.named_parameters():
+        table.add_row([n, p.shape, p.requires_grad])
+    table.align = 'l'
+    logger.info('\n' + table.get_string())
     model = nn.parallel.DistributedDataParallel(model.cuda(),
                                                 device_ids=[cfgs.gpu],
                                                 find_unused_parameters=True)
