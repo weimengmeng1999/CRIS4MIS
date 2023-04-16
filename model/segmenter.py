@@ -95,25 +95,32 @@ class CRIS(nn.Module):
         vis = self.backbone.encode_image(img)
 
         if self.use_moe_select_best_sent:
-            # 有待优化
-            pred_all = img.new_zeros(
-                (batch_size, self.max_sent_num, img_h // 4, img_w // 4))
-            score_all = img.new_zeros((batch_size, self.max_sent_num))
-            for i_sent in range(self.max_sent_num):
-                f_word, state = self.backbone.encode_text(word[:, i_sent, :])
-                # b, 512, 26, 26 (C4)
-                if self.neck_with_text_state:
-                    fq = self.neck(vis, state)
-                else:
-                    fq = self.neck(vis)
-                b, c, h, w = fq.size()
-                fq = self.decoder(fq, f_word, pad_mask[:, i_sent, :])
-                fq = fq.reshape(b, c, h, w)
-                # b, 1, 104, 104
-                pred = self.proj(fq, state)
-                score = self.sent_selector(fq, state)
-                pred_all[:, i_sent:i_sent + 1] = pred
-                score_all[:, i_sent] = score
+            # (b, sent_num, words) -> (b*sent_num, words)
+            word = word.reshape((batch_size*self.max_sent_num, -1))
+            pad_mask = pad_mask.reshape((batch_size*self.max_sent_num, -1))
+            f_word, state = self.backbone.encode_text(word)
+            if self.neck_with_text_state:
+                fq_list = []
+                for i_sent in range(self.max_sent_num):
+                    this_fq = self.neck(vis, state[i_sent*batch_size:(i_sent+1)*batch_size])
+                    fq_list.append(this_fq)
+                fq = torch.stack(fq_list, dim=0)
+            else:
+                fq = self.neck(vis)
+                fq = fq.repeat((self.max_sent_num, 1, 1, 1))
+                ori_shape = fq.shape
+                fq = fq.reshape((self.max_sent_num, batch_size,) + ori_shape[1:])
+            fq = fq.transpose(0, 1)
+            ori_shape = fq.shape
+            fq = fq.reshape((ori_shape[0] * ori_shape[1],) + ori_shape[2:])
+            b, c, h, w = fq.size()
+            fq = self.decoder(fq, f_word, pad_mask)
+            fq = fq.reshape(b, c, h, w)
+            pred = self.proj(fq, state)
+            score = self.sent_selector(fq, state)
+            pred_all = pred.reshape((batch_size, self.max_sent_num, img_h // 4, img_w // 4))
+            score_all = score.reshape((batch_size, self.max_sent_num))
+
             best_idx = torch.argmax(score_all, dim=1)  # b, 7
             best_idx_oh = F.one_hot(best_idx, num_classes=self.max_sent_num)
             pred_mask = torch.ones(
