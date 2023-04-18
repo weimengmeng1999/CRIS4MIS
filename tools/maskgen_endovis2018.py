@@ -73,7 +73,6 @@ if __name__ == '__main__':
             labl = cv2.imread(str(mask_folder / file_name.name))
             mask = RGBtoOneHot(labl, labels)
 
-            # print(np.unique(mask))
 
             #binary
             mask_binary[mask > 0] = 1
@@ -81,24 +80,24 @@ if __name__ == '__main__':
             mask_binary[mask == 5] = 0
             mask_binary[mask == 10] = 0
 
-            # #parts
-            # mask_parts[mask == 1] = 1  # Shaft
-            # mask_parts[mask == 2] = 2  # Wrist
-            # mask_parts[mask == 3] = 3  # Claspers
+            #parts
+            mask_parts[mask == 1] = 1  # Shaft
+            mask_parts[mask == 2] = 2  # Wrist
+            mask_parts[mask == 3] = 3  # Claspers
 
-            # #instruments
-            # mask_instruments[mask == 6] = 1
-            # mask_instruments[mask == 7] = 2
-            # mask_instruments[mask == 8] = 3
-            # mask_instruments[mask == 9] = 4
-            # mask_instruments[mask == 11] = 5
-            # mask_instruments[mask == 1] = 6  # Shaft
-            # mask_instruments[mask == 2] = 6  # Wrist
-            # mask_instruments[mask == 3] = 6  # Claspers
+            #instruments
+            mask_instruments[mask == 6] = 1
+            mask_instruments[mask == 7] = 2
+            mask_instruments[mask == 8] = 3
+            mask_instruments[mask == 9] = 4
+            mask_instruments[mask == 11] = 5
+            mask_instruments[mask == 1] = 6  # Shaft
+            mask_instruments[mask == 2] = 6  # Wrist
+            mask_instruments[mask == 3] = 6  # Claspers
             
             mask_binary=mask_binary* binary_factor
-            # mask_parts=mask_parts* parts_factor
-            # mask_instruments=mask_instruments* instrument_factor
+            mask_parts=mask_parts* parts_factor
+            mask_instruments=mask_instruments* instrument_factor
             cv2.imwrite(str(binary_mask_folder / file_name.name), mask_binary)
-            # cv2.imwrite(str(parts_mask_folder / file_name.name), mask_parts)
-            # cv2.imwrite(str(instrument_mask_folder / file_name.name), mask_instruments)
+            cv2.imwrite(str(parts_mask_folder / file_name.name), mask_parts)
+            cv2.imwrite(str(instrument_mask_folder / file_name.name), mask_instruments)
